@@ -143,6 +143,22 @@ export async function branchExists(
 }
 
 /**
+ * Get the repository name from the remote origin URL or directory name
+ */
+export async function getRepoName(): Promise<string> {
+  const result = await $`git config --get remote.origin.url`.nothrow().quiet();
+  if (result.exitCode === 0) {
+    const url = result.stdout.toString().trim();
+    const match = url.match(/\/([^/]+?)(?:\.git)?$/);
+    if (match?.[1]) return match[1];
+  }
+
+  const toplevel = await $`git rev-parse --show-toplevel`.quiet().text();
+  const parts = toplevel.trim().split("/");
+  return parts[parts.length - 1] || "repo";
+}
+
+/**
  * Get the default branch name (main or master)
  */
 export async function getDefaultBranch(): Promise<string | null> {

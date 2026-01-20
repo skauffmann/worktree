@@ -1,7 +1,7 @@
 import * as p from "@clack/prompts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { getCurrentBranch, getCurrentWorktreePath, getMainRepoPath, isInsideGitRepo, isInsideWorktree, type WorktreeInfo } from "./lib/git";
+import { getCurrentBranch, getCurrentWorktreePath, getMainRepoPath, getRepoName, isInsideGitRepo, isInsideWorktree, type WorktreeInfo } from "./lib/git";
 import { createDotEnvFilesOperation } from "./operations/create-dot-env-files-operation";
 import { createWorktreeOperation } from "./operations/create-worktree-operation";
 import { installDependenciesOperation } from "./operations/install-dependencies-operation";
@@ -43,10 +43,11 @@ async function handleNewWorktree(defaultBranchName?: string): Promise<void> {
   const mainRepoPath = await getMainRepoPath();
   const createNewBranchResult = await prompteBranchAction(worktreeSelection.branchName);
   const baseBranch = createNewBranchResult === "create" ? await promptBaseBranch() : undefined;
+  const repoName = await getRepoName();
   const worktreePath = join(
     mainRepoPath,
     "..",
-    worktreeSelection.branchName.replace(/\//g, "-")
+    `${repoName}-${worktreeSelection.branchName.replace(/\//g, "-")}`
   );
 
   if (existsSync(worktreePath)) {
