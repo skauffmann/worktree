@@ -103,7 +103,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - name: Download all artifacts
@@ -154,8 +154,6 @@ jobs:
           EOF
 
       - name: Publish platform packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for platform in darwin-arm64 darwin-x64 linux-x64 linux-arm64 win32-x64; do
             echo "Publishing @skauffmann/worktree-${platform}..."
@@ -165,8 +163,6 @@ jobs:
           done
 
       - name: Publish main package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd dist/worktree
           npm publish --access public --provenance
