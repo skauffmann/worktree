@@ -26,6 +26,7 @@ import {
   promptConfirm,
   promptSelect,
 } from "../lib/prompts.ts";
+import { detectEditor, openInEditor as launchEditor } from "../lib/editor.ts";
 import type { EnvFileAction } from "../types.ts";
 
 export async function worktreeCommand(branchArg?: string): Promise<void> {
@@ -88,8 +89,8 @@ async function handleExistingWorktree(): Promise<void> {
 
 async function handleNewWorktree(branchArg?: string): Promise<void> {
   const mainRepoPath = await getCurrentWorktreePath();
+  const editor = await detectEditor();
 
-  // List existing worktrees (exclude main)
   const worktrees = await listWorktrees();
   const linkedWorktrees = worktrees.filter((wt) => !wt.isMain);
 
@@ -139,9 +140,13 @@ async function handleNewWorktree(branchArg?: string): Promise<void> {
       }
 
       if (action === "open") {
+        if (!editor) {
+          p.cancel("No editor found. Set WORKTREE_EDITOR or install cursor/code/zed.");
+          process.exit(1);
+        }
         const spinner = p.spinner();
         spinner.start("Opening in editor...");
-        await $`cursor ${selected}`.nothrow().quiet();
+        await launchEditor(editor, selected);
         spinner.stop("Opened in editor.");
         p.outro(`Worktree: ${selected}`);
         return;
@@ -203,9 +208,13 @@ async function handleNewWorktree(branchArg?: string): Promise<void> {
     }
 
     if (action === "open") {
+      if (!editor) {
+        p.cancel("No editor found. Set WORKTREE_EDITOR or install cursor/code/zed.");
+        process.exit(1);
+      }
       const spinner = p.spinner();
       spinner.start("Opening in editor...");
-      await $`cursor ${existingWorktree.path}`.nothrow().quiet();
+      await launchEditor(editor, existingWorktree.path);
       spinner.stop("Opened in editor.");
       p.outro(`Worktree: ${existingWorktree.path}`);
       return;
@@ -270,9 +279,13 @@ async function handleNewWorktree(branchArg?: string): Promise<void> {
     }
 
     if (action === "open") {
+      if (!editor) {
+        p.cancel("No editor found. Set WORKTREE_EDITOR or install cursor/code/zed.");
+        process.exit(1);
+      }
       const spinner = p.spinner();
       spinner.start("Opening in editor...");
-      await $`cursor ${worktreePath}`.nothrow().quiet();
+      await launchEditor(editor, worktreePath);
       spinner.stop("Opened in editor.");
       p.outro(`Worktree: ${worktreePath}`);
       return;
@@ -342,11 +355,12 @@ async function handleNewWorktree(branchArg?: string): Promise<void> {
     });
   }
 
-  // Ask about opening in editor
-  const openInEditor = await promptConfirm({
-    message: "Open in editor (cursor) after creation?",
-    initialValue: true,
-  });
+  const shouldOpenInEditor = editor
+    ? await promptConfirm({
+        message: `Open in editor (${editor}) after creation?`,
+        initialValue: true,
+      })
+    : false;
 
   // Execute actions
   const spinner = p.spinner();
@@ -366,10 +380,9 @@ async function handleNewWorktree(branchArg?: string): Promise<void> {
   }
   spinner.stop("Worktree created.");
 
-  // Open in editor immediately
-  if (openInEditor) {
+  if (shouldOpenInEditor && editor) {
     spinner.start("Opening in editor...");
-    await $`cursor ${worktreePath}`.nothrow().quiet();
+    await launchEditor(editor, worktreePath);
     spinner.stop("Opened in editor.");
   }
 
