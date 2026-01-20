@@ -20,7 +20,7 @@ jobs:
             arch: arm64
             binary: worktree
 
-          - os: macos-13
+          - os: macos-latest
             target: bun-darwin-x64
             platform: darwin
             arch: x64
