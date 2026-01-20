@@ -1,5 +1,5 @@
 {
-  "name": "worktree",
+  "name": "@skauffmann/worktree",
   "version": "1.0.0",
   "module": "src/index.ts",
   "type": "module",
