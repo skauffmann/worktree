@@ -1,0 +1,183 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: bun-darwin-arm64
+            platform: darwin
+            arch: arm64
+            binary: worktree
+
+          - os: macos-13
+            target: bun-darwin-x64
+            platform: darwin
+            arch: x64
+            binary: worktree
+
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            platform: linux
+            arch: x64
+            binary: worktree
+
+          - os: ubuntu-latest
+            target: bun-linux-arm64
+            platform: linux
+            arch: arm64
+            binary: worktree
+
+          - os: windows-latest
+            target: bun-windows-x64
+            platform: win32
+            arch: x64
+            binary: worktree.exe
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build binary
+        shell: bash
+        run: |
+          mkdir -p dist/${{ matrix.platform }}-${{ matrix.arch }}/bin
+          bun build --compile --minify --target=${{ matrix.target }} ./src/index.ts --outfile dist/${{ matrix.platform }}-${{ matrix.arch }}/bin/${{ matrix.binary }}
+
+      - name: Create package.json
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          cat > dist/${{ matrix.platform }}-${{ matrix.arch }}/package.json << EOF
+          {
+            "name": "@skauffmann/worktree-${{ matrix.platform }}-${{ matrix.arch }}",
+            "version": "${VERSION}",
+            "description": "${{ matrix.platform }} ${{ matrix.arch }} binary for worktree",
+            "license": "MIT",
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/skauffmann/worktree.git"
+            },
+            "os": ["${{ matrix.platform }}"],
+            "cpu": ["${{ matrix.arch }}"],
+            "bin": {
+              "worktree": "bin/${{ matrix.binary }}"
+            }
+          }
+          EOF
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: worktree-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/${{ matrix.platform }}-${{ matrix.arch }}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare main package
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          mkdir -p dist/worktree/bin
+          mkdir -p dist/worktree/scripts
+
+          # Copy bin shim and install script
+          cp packages/worktree/bin/worktree dist/worktree/bin/
+          cp packages/worktree/scripts/install.js dist/worktree/scripts/
+
+          # Generate main package.json with version
+          cat > dist/worktree/package.json << EOF
+          {
+            "name": "@skauffmann/worktree",
+            "version": "${VERSION}",
+            "description": "CLI tool for managing Git worktrees with interactive prompts",
+            "license": "MIT",
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/skauffmann/worktree.git"
+            },
+            "bin": {
+              "worktree": "bin/worktree"
+            },
+            "scripts": {
+              "postinstall": "node scripts/install.js"
+            },
+            "optionalDependencies": {
+              "@skauffmann/worktree-darwin-arm64": "${VERSION}",
+              "@skauffmann/worktree-darwin-x64": "${VERSION}",
+              "@skauffmann/worktree-linux-x64": "${VERSION}",
+              "@skauffmann/worktree-linux-arm64": "${VERSION}",
+              "@skauffmann/worktree-win32-x64": "${VERSION}"
+            },
+            "engines": {
+              "node": ">=18"
+            },
+            "keywords": ["git", "worktree", "cli", "workflow"]
+          }
+          EOF
+
+      - name: Publish platform packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for platform in darwin-arm64 darwin-x64 linux-x64 linux-arm64 win32-x64; do
+            echo "Publishing @skauffmann/worktree-${platform}..."
+            cd artifacts/worktree-${platform}
+            npm publish --access public --provenance
+            cd ../..
+          done
+
+      - name: Publish main package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd dist/worktree
+          npm publish --access public --provenance
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/worktree-darwin-arm64/bin/worktree
+            artifacts/worktree-darwin-x64/bin/worktree
+            artifacts/worktree-linux-x64/bin/worktree
+            artifacts/worktree-linux-arm64/bin/worktree
+            artifacts/worktree-win32-x64/bin/worktree.exe

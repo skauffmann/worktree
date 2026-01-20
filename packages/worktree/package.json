@@ -1,0 +1,32 @@
+{
+  "name": "@skauffmann/worktree",
+  "version": "1.0.0",
+  "description": "CLI tool for managing Git worktrees with interactive prompts",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/skauffmann/worktree.git"
+  },
+  "bin": {
+    "worktree": "bin/worktree"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install.js"
+  },
+  "optionalDependencies": {
+    "@skauffmann/worktree-darwin-arm64": "1.0.0",
+    "@skauffmann/worktree-darwin-x64": "1.0.0",
+    "@skauffmann/worktree-linux-x64": "1.0.0",
+    "@skauffmann/worktree-linux-arm64": "1.0.0",
+    "@skauffmann/worktree-win32-x64": "1.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "git",
+    "worktree",
+    "cli",
+    "workflow"
+  ]
+}
