@@ -1,14 +1,15 @@
 import { createWorktree } from "../lib/git";
 import * as p from "@clack/prompts";
 
-export async function createWorktreeOperation(path: string, branch: string, shouldCreateBranch: boolean = true): Promise<void> {
+export async function createWorktreeOperation(path: string, branch: string, shouldCreateBranch: boolean = true, baseBranch?: string): Promise<void> {
   const spinner = p.spinner();
   spinner.start("Creating worktree...");
 
   const createResult = await createWorktree(
     path,
     branch,
-    shouldCreateBranch
+    shouldCreateBranch,
+    baseBranch
   );
 
   if (!createResult.success) {

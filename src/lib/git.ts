@@ -53,12 +53,17 @@ export async function getCurrentBranch(): Promise<string | null> {
 export async function createWorktree(
   path: string,
   branch: string,
-  shouldCreateBranch: boolean = true
+  shouldCreateBranch: boolean = true,
+  baseBranch?: string
 ): Promise<{ success: boolean; error?: string }> {
   let result;
 
   if (shouldCreateBranch) {
-    result = await $`git worktree add -b ${branch} ${path}`.nothrow().quiet();
+    if (baseBranch) {
+      result = await $`git worktree add -b ${branch} ${path} ${baseBranch}`.nothrow().quiet();
+    } else {
+      result = await $`git worktree add -b ${branch} ${path}`.nothrow().quiet();
+    }
   } else {
     result = await $`git worktree add ${path} ${branch}`.nothrow().quiet();
   }
@@ -135,4 +140,43 @@ export async function branchExists(
     local: localResult.exitCode === 0,
     remote: remoteResult.exitCode === 0,
   };
+}
+
+/**
+ * Get the default branch name (main or master)
+ */
+export async function getDefaultBranch(): Promise<string | null> {
+  const result = await $`git symbolic-ref refs/remotes/origin/HEAD`.nothrow().quiet();
+  if (result.exitCode === 0) {
+    const ref = result.stdout.toString().trim();
+    return ref.replace("refs/remotes/origin/", "");
+  }
+
+  const mainExists = await $`git show-ref --verify --quiet refs/heads/main`.nothrow().quiet();
+  if (mainExists.exitCode === 0) return "main";
+
+  const masterExists = await $`git show-ref --verify --quiet refs/heads/master`.nothrow().quiet();
+  if (masterExists.exitCode === 0) return "master";
+
+  return null;
+}
+
+/**
+ * Check if origin remote branch exists and is ahead of local
+ */
+export async function isOriginAhead(branch: string): Promise<{ exists: boolean; ahead: number }> {
+  const remoteRef = `origin/${branch}`;
+
+  const refExists = await $`git show-ref --verify --quiet refs/remotes/${remoteRef}`.nothrow().quiet();
+  if (refExists.exitCode !== 0) {
+    return { exists: false, ahead: 0 };
+  }
+
+  const result = await $`git rev-list --count ${branch}..${remoteRef}`.nothrow().quiet();
+  if (result.exitCode !== 0) {
+    return { exists: true, ahead: 0 };
+  }
+
+  const ahead = parseInt(result.stdout.toString().trim(), 10);
+  return { exists: true, ahead };
 }

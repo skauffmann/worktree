@@ -7,6 +7,7 @@ import { createWorktreeOperation } from "./operations/create-worktree-operation"
 import { installDependenciesOperation } from "./operations/install-dependencies-operation";
 import { openInEditorOperation } from "./operations/open-in-editor-operation";
 import { removeWorktreeOperation } from "./operations/remove-worktree-operation";
+import { promptBaseBranch } from "./prompts/prompt-base-branch";
 import { prompteBranchAction } from "./prompts/prompt-branch-action";
 import { promptDotEnvFiles } from "./prompts/prompt-dot-env-files";
 import { promptExistingPathAction } from "./prompts/prompt-existing-path-action";
@@ -41,6 +42,7 @@ async function handleNewWorktree(defaultBranchName?: string): Promise<void> {
 
   const mainRepoPath = await getMainRepoPath();
   const createNewBranchResult = await prompteBranchAction(worktreeSelection.branchName);
+  const baseBranch = createNewBranchResult === "create" ? await promptBaseBranch() : undefined;
   const worktreePath = join(
     mainRepoPath,
     "..",
@@ -74,7 +76,7 @@ async function handleNewWorktree(defaultBranchName?: string): Promise<void> {
   const shouldInstallDependencies = await promptInstallDependencies(mainRepoPath);
   const shouldOpenInEditor = await promptOpenInEditor();
 
-  await createWorktreeOperation(worktreePath, worktreeSelection.branchName, createNewBranchResult === "create");
+  await createWorktreeOperation(worktreePath, worktreeSelection.branchName, createNewBranchResult === "create", baseBranch);
 
   if (shouldOpenInEditor) {
     await openInEditorOperation(worktreePath);
