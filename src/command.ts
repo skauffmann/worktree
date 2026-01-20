@@ -15,8 +15,6 @@ import { promptOpenInEditor } from "./prompts/prompt-open-in-editor";
 import { promptWorktreeAction } from "./prompts/prompt-worktree-action";
 
 export async function worktreeCommand(branchArg?: string): Promise<void> {
-  p.intro("Git Worktree Manager");
-
   const isGitRepo = await isInsideGitRepo();
   if (!isGitRepo) {
     p.cancel("Not inside a git repository.");
