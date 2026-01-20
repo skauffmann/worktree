@@ -20,7 +20,7 @@ jobs:
             arch: arm64
             binary: worktree
 
-          - os: macos-13
+          - os: macos-latest
             target: bun-darwin-x64
             platform: darwin
             arch: x64
@@ -103,7 +103,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - name: Download all artifacts
