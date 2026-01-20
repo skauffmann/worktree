@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { worktreeCommand } from "./commands/worktree.ts";
+import { worktreeCommand } from "./command.ts";
 
 async function main() {
   const branchArg = process.argv[2];

@@ -1,4 +1,5 @@
 import { $ } from "bun";
+import { resolve, dirname } from "node:path";
 
 /**
  * Check if current directory is inside a git repository
@@ -26,8 +27,7 @@ export async function isInsideWorktree(): Promise<boolean> {
  */
 export async function getMainRepoPath(): Promise<string> {
   const commonDir = await $`git rev-parse --git-common-dir`.quiet().text();
-  const resolved = await $`dirname ${commonDir.trim()}`.quiet().text();
-  return resolved.trim();
+  return resolve(dirname(commonDir.trim()));
 }
 
 /**
@@ -53,11 +53,11 @@ export async function getCurrentBranch(): Promise<string | null> {
 export async function createWorktree(
   path: string,
   branch: string,
-  createBranch: boolean = true
+  shouldCreateBranch: boolean = true
 ): Promise<{ success: boolean; error?: string }> {
   let result;
 
-  if (createBranch) {
+  if (shouldCreateBranch) {
     result = await $`git worktree add -b ${branch} ${path}`.nothrow().quiet();
   } else {
     result = await $`git worktree add ${path} ${branch}`.nothrow().quiet();
