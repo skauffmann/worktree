@@ -223,13 +223,17 @@ jobs:
           cd dist/worktree
           npm publish --access public --provenance
 
+      - name: Prepare binaries for release
+        run: |
+          mkdir -p release-binaries
+          cp artifacts/worktree-darwin-arm64/bin/worktree release-binaries/worktree-darwin-arm64
+          cp artifacts/worktree-darwin-x64/bin/worktree release-binaries/worktree-darwin-x64
+          cp artifacts/worktree-linux-x64/bin/worktree release-binaries/worktree-linux-x64
+          cp artifacts/worktree-linux-arm64/bin/worktree release-binaries/worktree-linux-arm64
+          cp artifacts/worktree-win32-x64/bin/worktree.exe release-binaries/worktree-win32-x64.exe
+
       - name: Update GitHub Release with binaries
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.version.outputs.new_release_version }}
-          files: |
-            artifacts/worktree-darwin-arm64/bin/worktree
-            artifacts/worktree-darwin-x64/bin/worktree
-            artifacts/worktree-linux-x64/bin/worktree
-            artifacts/worktree-linux-arm64/bin/worktree
-            artifacts/worktree-win32-x64/bin/worktree.exe
+          files: release-binaries/*
