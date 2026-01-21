@@ -14,7 +14,9 @@ Working on multiple branches simultaneously shouldn't be painful. Git worktrees 
 - **Environment file handling** — Automatically symlink or copy your `.env` files from all directories and subdirectories
 - **Dependency installation** — Detects your package manager and installs dependencies
 - **Editor integration** — Opens your new worktree in Cursor, VS Code, or Zed
+- **Terminal integration** — Option to open the worktree in a new terminal tab
 - **Smart detection** — Knows when you're inside a worktree and offers relevant actions
+- **Auto-fetch** — Fetches latest from origin before creating a worktree
 - **Update notifications** — Keeps you informed about new versions
 
 ## Installation
@@ -56,15 +58,18 @@ worktree feature/awesome-feature
 ### What happens when you run it?
 
 1. **Enter a branch name** — Creates the worktree directory named after your branch
-2. **Choose branch action** — Track an existing remote branch or create a new one
-3. **Handle environment files** — Symlink (recommended) or copy your `.env` files from all directories and subdirectories
-4. **Install dependencies** — Automatically runs your package manager
-5. **Open in editor** — Jump straight into coding
+2. **Fetch latest** — Automatically fetches from origin to ensure up-to-date branches
+3. **Choose branch action** — Track an existing remote branch or create a new one
+4. **Handle environment files** — Symlink (recommended) or copy your `.env` files from all directories and subdirectories
+5. **Install dependencies** — Automatically runs your package manager
+6. **Open in editor** — Jump straight into coding
+7. **Open in terminal** — Optionally open a new terminal tab in the worktree directory
 
 ### Managing existing worktrees
 
 When you run `worktree` from inside an existing worktree (or when worktrees exist), you get additional options:
 
+- **Create new worktree** — Start a new worktree from the current branch or origin/main
 - **Open** — Open the worktree in your editor
 - **Replace** — Delete and recreate the worktree
 - **Delete** — Remove the worktree completely

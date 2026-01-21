@@ -178,6 +178,9 @@ jobs:
           cp packages/worktree/bin/worktree dist/worktree/bin/
           cp packages/worktree/scripts/install.js dist/worktree/scripts/
 
+          # Copy README
+          cp README.md dist/worktree/
+
           # Generate main package.json with version
           cat > dist/worktree/package.json << EOF
           {
