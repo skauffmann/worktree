@@ -160,6 +160,22 @@ describe("git", () => {
       expect(result.success).toBe(false);
       expect(result.error).toBeTruthy();
     });
+
+    test("should configure upstream to track itself when creating new branch", async () => {
+      const worktreePath = join(testDir, "..", "test-worktree-upstream");
+      const branchName = "test-upstream-branch";
+
+      const createResult = await createWorktree(worktreePath, branchName, true);
+      expect(createResult.success).toBe(true);
+
+      const remoteResult = await $`git config branch.${branchName}.remote`.nothrow().quiet();
+      expect(remoteResult.stdout.toString().trim()).toBe("origin");
+
+      const mergeResult = await $`git config branch.${branchName}.merge`.nothrow().quiet();
+      expect(mergeResult.stdout.toString().trim()).toBe(`refs/heads/${branchName}`);
+
+      await removeWorktree(worktreePath);
+    });
   });
 
   describe("worktree integration", () => {

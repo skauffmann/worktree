@@ -71,6 +71,12 @@ export async function createWorktree(
   if (result.exitCode !== 0) {
     return { success: false, error: result.stderr.toString() };
   }
+
+  if (shouldCreateBranch) {
+    await $`git config branch.${branch}.remote origin`.nothrow().quiet();
+    await $`git config branch.${branch}.merge refs/heads/${branch}`.nothrow().quiet();
+  }
+
   return { success: true };
 }
 
