@@ -30,7 +30,7 @@ export async function worktreeCommand(branchArg?: string): Promise<void> {
   const inWorktree = await isInsideWorktree();
 
   if (inWorktree) {
-    await handleExistingWorktree();
+    await handleExistingWorktree(undefined, branchArg);
     return;
   }
 
@@ -108,7 +108,7 @@ async function handleNewWorktree(defaultBranchName?: string, baseBranchOverride?
   p.outro(`Worktree ready at: ${worktreePath}`);
 }
 
-async function handleExistingWorktree(defaultWorktree?: WorktreeInfo | null): Promise<void> {
+async function handleExistingWorktree(defaultWorktree?: WorktreeInfo | null, defaultBranchName?: string): Promise<void> {
   const path = defaultWorktree?.path ?? await getCurrentWorktreePath();
   const branch = defaultWorktree?.branch ?? await getCurrentBranch();
 
@@ -122,7 +122,7 @@ async function handleExistingWorktree(defaultWorktree?: WorktreeInfo | null): Pr
 
     if (inWorktreeAction === "create") {
       const sourceResult = await promptWorktreeSource();
-      await handleNewWorktree(undefined, sourceResult.baseBranch);
+      await handleNewWorktree(defaultBranchName, sourceResult.baseBranch);
       return;
     }
   }
