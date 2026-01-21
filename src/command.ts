@@ -7,6 +7,7 @@ import { createWorktreeOperation } from "./operations/create-worktree-operation"
 import { installDependenciesOperation } from "./operations/install-dependencies-operation";
 import { openInEditorOperation } from "./operations/open-in-editor-operation";
 import { openInTerminalOperation } from "./operations/open-in-terminal-operation";
+import { fetchOriginOperation } from "./operations/fetch-origin-operation";
 import { removeWorktreeOperation } from "./operations/remove-worktree-operation";
 import { promptBaseBranch } from "./prompts/prompt-base-branch";
 import { prompteBranchAction } from "./prompts/prompt-branch-action";
@@ -41,6 +42,8 @@ async function handleNewWorktree(defaultBranchName?: string): Promise<void> {
     await handleExistingWorktree(worktreeSelection.worktree);
     return;
   }
+
+  await fetchOriginOperation();
 
   const mainRepoPath = await getMainRepoPath();
   const createNewBranchResult = await prompteBranchAction(worktreeSelection.branchName);

@@ -13,6 +13,7 @@ import {
   removeWorktree,
   listWorktrees,
   branchExists,
+  gitFetch,
 } from "./git";
 
 describe("git", () => {
@@ -120,6 +121,13 @@ describe("git", () => {
     test("should return false for non-existent branch", async () => {
       const result = await branchExists("non-existent-branch-xyz-123");
       expect(result.local).toBe(false);
+    });
+  });
+
+  describe("gitFetch", () => {
+    test("should return error when no remote exists", async () => {
+      const result = await gitFetch();
+      expect(result.success).toBe(false);
     });
   });
 
