@@ -6,6 +6,7 @@ import { createDotEnvFilesOperation } from "./operations/create-dot-env-files-op
 import { createWorktreeOperation } from "./operations/create-worktree-operation";
 import { installDependenciesOperation } from "./operations/install-dependencies-operation";
 import { openInEditorOperation } from "./operations/open-in-editor-operation";
+import { openInTerminalOperation } from "./operations/open-in-terminal-operation";
 import { removeWorktreeOperation } from "./operations/remove-worktree-operation";
 import { promptBaseBranch } from "./prompts/prompt-base-branch";
 import { prompteBranchAction } from "./prompts/prompt-branch-action";
@@ -13,6 +14,7 @@ import { promptDotEnvFiles } from "./prompts/prompt-dot-env-files";
 import { promptExistingPathAction } from "./prompts/prompt-existing-path-action";
 import { promptInstallDependencies } from "./prompts/prompt-install-dependencies";
 import { promptOpenInEditor } from "./prompts/prompt-open-in-editor";
+import { promptOpenInTerminal } from "./prompts/prompt-open-in-terminal";
 import { promptWorktreeAction } from "./prompts/prompt-worktree-action";
 
 export async function worktreeCommand(branchArg?: string): Promise<void> {
@@ -76,11 +78,16 @@ async function handleNewWorktree(defaultBranchName?: string): Promise<void> {
   const dotEnvAction = await promptDotEnvFiles(mainRepoPath);
   const shouldInstallDependencies = await promptInstallDependencies(mainRepoPath);
   const shouldOpenInEditor = await promptOpenInEditor();
+  const shouldOpenInTerminal = await promptOpenInTerminal();
 
   await createWorktreeOperation(worktreePath, worktreeSelection.branchName, createNewBranchResult === "create", baseBranch);
 
   if (shouldOpenInEditor) {
     await openInEditorOperation(worktreePath);
+  }
+
+  if (shouldOpenInTerminal) {
+    await openInTerminalOperation(worktreePath);
   }
 
   if (dotEnvAction.action !== "nothing") {
