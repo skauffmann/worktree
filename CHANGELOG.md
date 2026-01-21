@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/skauffmann/worktree/compare/v1.3.0...v1.4.0) (2026-01-21)
+
+
+### Features
+
+* add option to create new worktree from existing worktree ([058067b](https://github.com/skauffmann/worktree/commit/058067bbddc6d51cfe2d47e52b0f92f873c7dd66))
+
 # [1.3.0](https://github.com/skauffmann/worktree/compare/v1.2.0...v1.3.0) (2026-01-21)
 
 
