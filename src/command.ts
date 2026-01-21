@@ -13,10 +13,12 @@ import { promptBaseBranch } from "./prompts/prompt-base-branch";
 import { prompteBranchAction } from "./prompts/prompt-branch-action";
 import { promptDotEnvFiles } from "./prompts/prompt-dot-env-files";
 import { promptExistingPathAction } from "./prompts/prompt-existing-path-action";
+import { promptInWorktreeAction } from "./prompts/prompt-in-worktree-action";
 import { promptInstallDependencies } from "./prompts/prompt-install-dependencies";
 import { promptOpenInEditor } from "./prompts/prompt-open-in-editor";
 import { promptOpenInTerminal } from "./prompts/prompt-open-in-terminal";
 import { promptWorktreeAction } from "./prompts/prompt-worktree-action";
+import { promptWorktreeSource } from "./prompts/prompt-worktree-source";
 
 export async function worktreeCommand(branchArg?: string): Promise<void> {
   const isGitRepo = await isInsideGitRepo();
@@ -35,7 +37,7 @@ export async function worktreeCommand(branchArg?: string): Promise<void> {
   await handleNewWorktree(branchArg);
 }
 
-async function handleNewWorktree(defaultBranchName?: string): Promise<void> {
+async function handleNewWorktree(defaultBranchName?: string, baseBranchOverride?: string): Promise<void> {
   const worktreeSelection = await promptWorktreeAction(defaultBranchName);
 
   if (worktreeSelection.type === "existing") {
@@ -47,7 +49,9 @@ async function handleNewWorktree(defaultBranchName?: string): Promise<void> {
 
   const mainRepoPath = await getMainRepoPath();
   const createNewBranchResult = await prompteBranchAction(worktreeSelection.branchName);
-  const baseBranch = createNewBranchResult === "create" ? await promptBaseBranch() : undefined;
+  const baseBranch = createNewBranchResult === "create"
+    ? (baseBranchOverride ?? await promptBaseBranch())
+    : undefined;
   const repoName = await getRepoName();
   const worktreePath = join(
     mainRepoPath,
@@ -112,6 +116,16 @@ async function handleExistingWorktree(defaultWorktree?: WorktreeInfo | null): Pr
     `Path: ${path}\nBranch: ${branch || "detached"}`,
     !defaultWorktree ? "You are inside a linked worktree" : undefined
   );
+
+  if (!defaultWorktree) {
+    const inWorktreeAction = await promptInWorktreeAction();
+
+    if (inWorktreeAction === "create") {
+      const sourceResult = await promptWorktreeSource();
+      await handleNewWorktree(undefined, sourceResult.baseBranch);
+      return;
+    }
+  }
 
   const action = await promptExistingPathAction(path);
 
