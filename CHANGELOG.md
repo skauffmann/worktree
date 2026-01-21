@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/skauffmann/worktree/compare/v1.4.0...v1.5.0) (2026-01-21)
+
+
+### Features
+
+* propagate branch name argument when creating worktree from existing worktree ([2435459](https://github.com/skauffmann/worktree/commit/2435459bafc7fd3a4aedd89e7c38163da0f6e476))
+
 # [1.4.0](https://github.com/skauffmann/worktree/compare/v1.3.0...v1.4.0) (2026-01-21)
 
 
