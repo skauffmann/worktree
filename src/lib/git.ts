@@ -202,3 +202,13 @@ export async function isOriginAhead(branch: string): Promise<{ exists: boolean; 
   const ahead = parseInt(result.stdout.toString().trim(), 10);
   return { exists: true, ahead };
 }
+
+export async function gitFetch(): Promise<{ success: boolean; error?: string }> {
+  const result = await $`git fetch origin`.nothrow().quiet();
+
+  if (result.exitCode !== 0) {
+    return { success: false, error: result.stderr.toString() };
+  }
+
+  return { success: true };
+}
