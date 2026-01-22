@@ -1,13 +1,13 @@
 import * as p from "@clack/prompts";
 import { detectTerminal, openInTerminal } from "../lib/terminal";
 
-export async function openInTerminalOperation(path: string): Promise<void> {
+export async function openInTerminalOperation(path: string, title?: string): Promise<void> {
   const spinner = p.spinner();
   const terminal = detectTerminal();
 
   spinner.start(`Opening in ${formatTerminalName(terminal.name)}...`);
 
-  const success = await openInTerminal(path);
+  const success = await openInTerminal(path, title);
 
   if (!success) {
     spinner.stop("Failed to open terminal.");
