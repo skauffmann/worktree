@@ -94,7 +94,7 @@ async function handleNewWorktree(defaultBranchName?: string, baseBranchOverride?
   }
 
   if (shouldOpenInTerminal) {
-    await openInTerminalOperation(worktreePath);
+    await openInTerminalOperation(worktreePath, `${repoName}: ${worktreeSelection.branchName}`);
   }
 
   if (dotEnvAction.action !== "nothing") {
