@@ -1,3 +1,16 @@
+# [1.6.0](https://github.com/skauffmann/worktree/compare/v1.5.0...v1.6.0) (2026-01-22)
+
+
+### Bug Fixes
+
+* use npm as default package manager fallback ([2196b6b](https://github.com/skauffmann/worktree/commit/2196b6b7d9f8808f7a8601cdebb6587a55c282d4))
+
+
+### Features
+
+* add terminal title support for worktrees ([e5a5d12](https://github.com/skauffmann/worktree/commit/e5a5d1254a7385d99d55f3991b59e7fc04327f0c))
+* add terminal title support for worktrees ([fd224c2](https://github.com/skauffmann/worktree/commit/fd224c2737ddc9005da90e4c192abe011da751aa))
+
 # [1.5.0](https://github.com/skauffmann/worktree/compare/v1.4.0...v1.5.0) (2026-01-21)
 
 
