@@ -161,10 +161,10 @@ describe("files", () => {
       expect(pm).toBe("npm");
     });
 
-    test("should default to bun when no lock file exists", async () => {
+    test("should default to npm when no lock file exists", async () => {
       const pm = await detectPackageManager(testDir);
 
-      expect(pm).toBe("bun");
+      expect(pm).toBe("npm");
     });
 
     test("should prefer bun.lockb over other lock files", async () => {

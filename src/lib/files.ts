@@ -88,8 +88,8 @@ export async function detectPackageManager(dir: string): Promise<PackageManager>
     }
   }
 
-  // Default to bun if no lock file found
-  return "bun";
+  // Default to npm if no lock file found
+  return "npm";
 }
 
 /**
