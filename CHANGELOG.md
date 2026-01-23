@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/skauffmann/worktree/compare/v1.7.1...v1.8.0) (2026-01-23)
+
+
+### Features
+
+* add support for .gen file extension in generated files detection ([#17](https://github.com/skauffmann/worktree/issues/17)) ([986a44a](https://github.com/skauffmann/worktree/commit/986a44afe59a30482e3014ee8e60f96b63ecb285))
+
 ## [1.7.1](https://github.com/skauffmann/worktree/compare/v1.7.0...v1.7.1) (2026-01-23)
 
 
