@@ -384,6 +384,31 @@ describe("files", () => {
 
       expect(generatedFiles).toContain(join("types", "generated.ts"));
     });
+
+    test("should find files with .gen extension", async () => {
+      await writeFile(join(testDir, "types.gen"), "");
+      await writeFile(join(testDir, "schema.gen"), "");
+      await writeFile(join(testDir, ".gitignore"), "*.gen");
+
+      const generatedFiles = await findGeneratedFiles(testDir);
+
+      expect(generatedFiles).toContain("types.gen");
+      expect(generatedFiles).toContain("schema.gen");
+    });
+
+    test("should only include gitignored .gen files", async () => {
+      await writeFile(join(testDir, "tracked.gen"), "");
+      await writeFile(join(testDir, "untracked.gen"), "");
+      await writeFile(join(testDir, ".gitignore"), "untracked.gen");
+
+      await $`git add tracked.gen`.quiet();
+      await $`git commit -m "Add tracked"`.quiet();
+
+      const generatedFiles = await findGeneratedFiles(testDir);
+
+      expect(generatedFiles).not.toContain("tracked.gen");
+      expect(generatedFiles).toContain("untracked.gen");
+    });
   });
 
   describe("copyGeneratedFiles", () => {
