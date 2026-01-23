@@ -1,14 +1,22 @@
-import { hasPackageJson } from "../lib/files";
+import { detectRepoStructure } from "../lib/files";
 import { promptConfirm } from "../lib/prompts";
 
 export async function promptInstallDependencies(path: string): Promise<boolean> {
-  const hasPackage = await hasPackageJson(path);
+  const repoStructure = await detectRepoStructure(path);
 
-  if (hasPackage) {
-    return promptConfirm({
-      message: "Install dependencies after creation?",
-      initialValue: true,
-    });
+  if (repoStructure.projects.length === 0) {
+    return false;
   }
-  return false
+
+  let message: string;
+  if (repoStructure.type === "multi-project") {
+    message = `Install dependencies in all projects after creation? (Found ${repoStructure.projects.length} projects)`;
+  } else {
+    message = "Install dependencies after creation?";
+  }
+
+  return promptConfirm({
+    message,
+    initialValue: true,
+  });
 }
