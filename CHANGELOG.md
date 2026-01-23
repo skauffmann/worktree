@@ -1,3 +1,10 @@
+## [1.7.1](https://github.com/skauffmann/worktree/compare/v1.7.0...v1.7.1) (2026-01-23)
+
+
+### Bug Fixes
+
+* stop spinner after each project in multi-project dependency installation ([#16](https://github.com/skauffmann/worktree/issues/16)) ([8aafac4](https://github.com/skauffmann/worktree/commit/8aafac4dc6bd0b6af0a021b79f094170df009a0f))
+
 # [1.7.0](https://github.com/skauffmann/worktree/compare/v1.6.0...v1.7.0) (2026-01-23)
 
 
