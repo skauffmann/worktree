@@ -27,6 +27,7 @@ export async function promptGeneratedFiles(
       value: file,
       label: file,
     })),
+    initialValues: generatedFiles,
     required: false,
   });
 
