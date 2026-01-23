@@ -213,6 +213,8 @@ export async function detectRepoStructure(dir: string): Promise<RepoStructure> {
 
   const rootPackageManager = rootHasPackageJson ? await detectPackageManager(rootPath) : undefined;
 
+  projects.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+
   return {
     type,
     rootPath,
