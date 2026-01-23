@@ -291,7 +291,7 @@ async function findGeneratedFilesRecursive(
 
   for (const entry of entries) {
     const fullPath = join(currentDir, entry.name);
-    const hasGenerated = entry.name.toLowerCase().includes("generated");
+    const hasGenerated = entry.name.toLowerCase().includes("generated") || entry.name.toLowerCase().endsWith(".gen");
 
     if (entry.isDirectory()) {
       if (entry.name === "node_modules" || entry.name === ".git") {

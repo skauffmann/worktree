@@ -17,7 +17,7 @@ export async function promptGeneratedFiles(
   }
 
   p.note(
-    `Found ${generatedFiles.length} gitignored file(s)/folder(s) with "generated" in name`,
+    `Found ${generatedFiles.length} gitignored file(s)/folder(s) with "generated" in name or ".gen" extension`,
     "Generated Files"
   );
 
