@@ -37,16 +37,18 @@ export async function installDependenciesOperation(mainRepoPath: string, worktre
 
       if (installResult.exitCode === 0) {
         successCount++;
+        spinner.stop(`Dependencies installed [${projectNum}/${totalProjects}]: ${projectName}.`);
       } else {
         failureCount++;
+        spinner.stop(`Warning: Installation failed [${projectNum}/${totalProjects}]: ${projectName}.`);
       }
       projectNum++;
     }
 
     if (failureCount === 0) {
-      spinner.stop(`Dependencies installed in ${successCount} project(s).`);
+      p.log.success(`All dependencies installed in ${successCount} project(s).`);
     } else {
-      spinner.stop(`Warning: ${successCount} succeeded, ${failureCount} failed.`);
+      p.log.warning(`Dependencies installed: ${successCount} succeeded, ${failureCount} failed.`);
     }
   }
 }
