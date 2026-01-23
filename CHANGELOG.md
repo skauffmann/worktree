@@ -1,3 +1,11 @@
+# [1.7.0](https://github.com/skauffmann/worktree/compare/v1.6.0...v1.7.0) (2026-01-23)
+
+
+### Features
+
+* add multi-project package installation support ([#12](https://github.com/skauffmann/worktree/issues/12)) ([c611940](https://github.com/skauffmann/worktree/commit/c61194072b3a2653022906ac4277c4123f0bd664))
+* add support for copying gitignored generated files to worktrees ([#14](https://github.com/skauffmann/worktree/issues/14)) ([c70e844](https://github.com/skauffmann/worktree/commit/c70e844702b487ac698b3efd4be46e3119a6ae19))
+
 # [1.6.0](https://github.com/skauffmann/worktree/compare/v1.5.0...v1.6.0) (2026-01-22)
 
 
