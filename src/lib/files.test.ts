@@ -17,6 +17,8 @@ import {
   detectPackageManager,
   symlinkEnvFiles,
   copyEnvFiles,
+  findGeneratedFiles,
+  copyGeneratedFiles,
 } from "./files";
 
 describe("files", () => {
@@ -288,6 +290,180 @@ describe("files", () => {
 
       expect(content1).toBe("CONTENT1=a");
       expect(content2).toBe("CONTENT2=b");
+    });
+  });
+
+  describe("findGeneratedFiles", () => {
+    test("should find files with 'generated' in name", async () => {
+      await writeFile(join(testDir, "foo.generated.js"), "");
+      await writeFile(join(testDir, "bar.generated.ts"), "");
+      await writeFile(join(testDir, ".gitignore"), "*.generated.js\n*.generated.ts");
+
+      const generatedFiles = await findGeneratedFiles(testDir);
+
+      expect(generatedFiles).toContain("foo.generated.js");
+      expect(generatedFiles).toContain("bar.generated.ts");
+    });
+
+    test("should find folders with 'generated' in name", async () => {
+      await mkdir(join(testDir, "generated"));
+      await writeFile(join(testDir, "generated", "test.txt"), "content");
+      await writeFile(join(testDir, ".gitignore"), "generated/");
+
+      const generatedFiles = await findGeneratedFiles(testDir);
+
+      expect(generatedFiles).toContain("generated");
+    });
+
+    test("should match case-insensitively", async () => {
+      await writeFile(join(testDir, "GENERATED.txt"), "");
+      await writeFile(join(testDir, "foo-GeNeRaTeD.js"), "");
+      await writeFile(join(testDir, ".gitignore"), "GENERATED.txt\nfoo-GeNeRaTeD.js");
+
+      const generatedFiles = await findGeneratedFiles(testDir);
+
+      expect(generatedFiles).toContain("GENERATED.txt");
+      expect(generatedFiles).toContain("foo-GeNeRaTeD.js");
+    });
+
+    test("should only include gitignored items", async () => {
+      await writeFile(join(testDir, "tracked.generated.js"), "");
+      await writeFile(join(testDir, "untracked.generated.js"), "");
+      await writeFile(join(testDir, ".gitignore"), "untracked.generated.js");
+
+      await $`git add tracked.generated.js`.quiet();
+      await $`git commit -m "Add tracked"`.quiet();
+
+      const generatedFiles = await findGeneratedFiles(testDir);
+
+      expect(generatedFiles).not.toContain("tracked.generated.js");
+      expect(generatedFiles).toContain("untracked.generated.js");
+    });
+
+    test("should skip node_modules and .git directories", async () => {
+      await mkdir(join(testDir, "node_modules"));
+      await writeFile(join(testDir, "node_modules", "generated.js"), "");
+      await writeFile(join(testDir, ".git", "generated.txt"), "");
+
+      const generatedFiles = await findGeneratedFiles(testDir);
+
+      expect(generatedFiles).not.toContain(join("node_modules", "generated.js"));
+      expect(generatedFiles).not.toContain(join(".git", "generated.txt"));
+    });
+
+    test("should return empty array when no matches", async () => {
+      await writeFile(join(testDir, "normal.js"), "");
+
+      const generatedFiles = await findGeneratedFiles(testDir);
+
+      expect(generatedFiles).toEqual([]);
+    });
+
+    test("should not include nested generated files inside generated folders", async () => {
+      await mkdir(join(testDir, "generated"));
+      await writeFile(join(testDir, "generated", "test.txt"), "");
+      await writeFile(join(testDir, "generated", "type-generated.ts"), "");
+      await writeFile(join(testDir, ".gitignore"), "generated/");
+
+      const generatedFiles = await findGeneratedFiles(testDir);
+
+      expect(generatedFiles).toContain("generated");
+      expect(generatedFiles).not.toContain(join("generated", "test.txt"));
+      expect(generatedFiles).not.toContain(join("generated", "type-generated.ts"));
+    });
+
+    test("should handle nested .gitignore files", async () => {
+      await mkdir(join(testDir, "types"));
+      await writeFile(join(testDir, "types", "generated.ts"), "");
+      await writeFile(join(testDir, "types", ".gitignore"), "generated.ts");
+
+      const generatedFiles = await findGeneratedFiles(testDir);
+
+      expect(generatedFiles).toContain(join("types", "generated.ts"));
+    });
+  });
+
+  describe("copyGeneratedFiles", () => {
+    test("should copy individual files", async () => {
+      const sourceDir = join(testDir, "source");
+      const targetDir = join(testDir, "target");
+
+      await mkdir(sourceDir);
+      await mkdir(targetDir);
+      await writeFile(join(sourceDir, "foo.generated.js"), "content123");
+
+      await copyGeneratedFiles(sourceDir, targetDir, ["foo.generated.js"]);
+
+      const content = await readFile(join(targetDir, "foo.generated.js"), "utf-8");
+      expect(content).toBe("content123");
+    });
+
+    test("should copy directories recursively", async () => {
+      const sourceDir = join(testDir, "source");
+      const targetDir = join(testDir, "target");
+
+      await mkdir(sourceDir);
+      await mkdir(targetDir);
+      await mkdir(join(sourceDir, "generated"));
+      await writeFile(join(sourceDir, "generated", "test.txt"), "nested content");
+      await writeFile(join(sourceDir, "generated", "deep.js"), "deep content");
+
+      await copyGeneratedFiles(sourceDir, targetDir, ["generated"]);
+
+      const content1 = await readFile(join(targetDir, "generated", "test.txt"), "utf-8");
+      const content2 = await readFile(join(targetDir, "generated", "deep.js"), "utf-8");
+
+      expect(content1).toBe("nested content");
+      expect(content2).toBe("deep content");
+    });
+
+    test("should create parent directories if needed", async () => {
+      const sourceDir = join(testDir, "source");
+      const targetDir = join(testDir, "target");
+
+      await mkdir(sourceDir);
+      await mkdir(join(sourceDir, "types"));
+      await writeFile(join(sourceDir, "types", "generated.ts"), "type content");
+
+      await copyGeneratedFiles(sourceDir, targetDir, [join("types", "generated.ts")]);
+
+      const content = await readFile(join(targetDir, "types", "generated.ts"), "utf-8");
+      expect(content).toBe("type content");
+    });
+
+    test("should preserve directory structure", async () => {
+      const sourceDir = join(testDir, "source");
+      const targetDir = join(testDir, "target");
+
+      await mkdir(sourceDir);
+      await mkdir(targetDir);
+      await mkdir(join(sourceDir, "generated"));
+      await mkdir(join(sourceDir, "generated", "nested"));
+      await writeFile(join(sourceDir, "generated", "nested", "file.txt"), "deep");
+
+      await copyGeneratedFiles(sourceDir, targetDir, ["generated"]);
+
+      const content = await readFile(join(targetDir, "generated", "nested", "file.txt"), "utf-8");
+      expect(content).toBe("deep");
+    });
+
+    test("should handle multiple items", async () => {
+      const sourceDir = join(testDir, "source");
+      const targetDir = join(testDir, "target");
+
+      await mkdir(sourceDir);
+      await mkdir(targetDir);
+      await mkdir(join(sourceDir, "generated"));
+      await writeFile(join(sourceDir, "generated", "test.txt"), "folder");
+      await writeFile(join(sourceDir, "foo.generated.js"), "file");
+
+      await copyGeneratedFiles(sourceDir, targetDir, ["generated", "foo.generated.js"]);
+
+      const content1 = await readFile(join(targetDir, "generated", "test.txt"), "utf-8");
+      const content2 = await readFile(join(targetDir, "foo.generated.js"), "utf-8");
+
+      expect(content1).toBe("folder");
+      expect(content2).toBe("file");
     });
   });
 });

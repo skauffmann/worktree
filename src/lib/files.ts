@@ -128,3 +128,91 @@ export async function copyEnvFiles(
     await copyFile(sourcePath, targetPath);
   }
 }
+
+async function isGitignored(filePath: string): Promise<boolean> {
+  const isTracked = await isFileTrackedByGit(filePath);
+  if (isTracked) return false;
+
+  const result = await $`git check-ignore --quiet ${filePath}`.nothrow().quiet();
+  return result.exitCode === 0;
+}
+
+async function copyDirectoryRecursive(
+  sourcePath: string,
+  targetPath: string
+): Promise<void> {
+  await mkdir(targetPath, { recursive: true });
+  const entries = await readdir(sourcePath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const sourceEntryPath = join(sourcePath, entry.name);
+    const targetEntryPath = join(targetPath, entry.name);
+
+    if (entry.isDirectory()) {
+      await copyDirectoryRecursive(sourceEntryPath, targetEntryPath);
+    } else if (entry.isFile()) {
+      await copyFile(sourceEntryPath, targetEntryPath);
+    }
+  }
+}
+
+export async function findGeneratedFiles(dir: string): Promise<string[]> {
+  const generatedFiles: string[] = [];
+  await findGeneratedFilesRecursive(dir, dir, generatedFiles);
+  return generatedFiles;
+}
+
+async function findGeneratedFilesRecursive(
+  rootDir: string,
+  currentDir: string,
+  generatedFiles: string[]
+): Promise<void> {
+  const entries = await readdir(currentDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const fullPath = join(currentDir, entry.name);
+    const hasGenerated = entry.name.toLowerCase().includes("generated");
+
+    if (entry.isDirectory()) {
+      if (entry.name === "node_modules" || entry.name === ".git") {
+        continue;
+      }
+
+      if (hasGenerated) {
+        const ignored = await isGitignored(fullPath);
+        if (ignored) {
+          const relativePath = relative(rootDir, fullPath);
+          generatedFiles.push(relativePath);
+          continue;
+        }
+      }
+
+      await findGeneratedFilesRecursive(rootDir, fullPath, generatedFiles);
+    } else if (entry.isFile() && hasGenerated) {
+      const ignored = await isGitignored(fullPath);
+      if (ignored) {
+        const relativePath = relative(rootDir, fullPath);
+        generatedFiles.push(relativePath);
+      }
+    }
+  }
+}
+
+export async function copyGeneratedFiles(
+  sourceDir: string,
+  targetDir: string,
+  items: string[]
+): Promise<void> {
+  for (const item of items) {
+    const sourcePath = join(sourceDir, item);
+    const targetPath = join(targetDir, item);
+    const stats = await stat(sourcePath);
+
+    if (stats.isDirectory()) {
+      await copyDirectoryRecursive(sourcePath, targetPath);
+    } else if (stats.isFile()) {
+      await mkdir(dirname(targetPath), { recursive: true });
+      await copyFile(sourcePath, targetPath);
+    }
+  }
+}

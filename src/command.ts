@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { getCurrentBranch, getCurrentWorktreePath, getMainRepoPath, getRepoName, isInsideGitRepo, isInsideWorktree, type WorktreeInfo } from "./lib/git";
 import { createDotEnvFilesOperation } from "./operations/create-dot-env-files-operation";
+import { copyGeneratedFilesOperation } from "./operations/copy-generated-files-operation";
 import { createWorktreeOperation } from "./operations/create-worktree-operation";
 import { installDependenciesOperation } from "./operations/install-dependencies-operation";
 import { openInEditorOperation } from "./operations/open-in-editor-operation";
@@ -13,6 +14,7 @@ import { promptBaseBranch } from "./prompts/prompt-base-branch";
 import { prompteBranchAction } from "./prompts/prompt-branch-action";
 import { promptDotEnvFiles } from "./prompts/prompt-dot-env-files";
 import { promptExistingPathAction } from "./prompts/prompt-existing-path-action";
+import { promptGeneratedFiles } from "./prompts/prompt-generated-files";
 import { promptInWorktreeAction } from "./prompts/prompt-in-worktree-action";
 import { promptInstallDependencies } from "./prompts/prompt-install-dependencies";
 import { promptOpenInEditor } from "./prompts/prompt-open-in-editor";
@@ -83,6 +85,7 @@ async function handleNewWorktree(defaultBranchName?: string, baseBranchOverride?
   }
 
   const dotEnvAction = await promptDotEnvFiles(mainRepoPath);
+  const generatedFilesAction = await promptGeneratedFiles(mainRepoPath);
   const shouldInstallDependencies = await promptInstallDependencies(mainRepoPath);
   const shouldOpenInEditor = await promptOpenInEditor();
   const shouldOpenInTerminal = await promptOpenInTerminal();
@@ -99,6 +102,14 @@ async function handleNewWorktree(defaultBranchName?: string, baseBranchOverride?
 
   if (dotEnvAction.action !== "nothing") {
     await createDotEnvFilesOperation(mainRepoPath, worktreePath, dotEnvAction.envFiles, dotEnvAction.action);
+  }
+
+  if (generatedFilesAction.shouldCopy && generatedFilesAction.generatedFiles.length > 0) {
+    await copyGeneratedFilesOperation(
+      mainRepoPath,
+      worktreePath,
+      generatedFilesAction.generatedFiles
+    );
   }
 
   if (shouldInstallDependencies) {
