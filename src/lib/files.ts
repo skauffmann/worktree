@@ -1,11 +1,7 @@
-import { readdir, stat, symlink, copyFile, mkdir } from "node:fs/promises";
+import { readdir, stat, symlink, copyFile, mkdir, readFile } from "node:fs/promises";
 import { join, resolve, relative, dirname } from "node:path";
 import { $ } from "bun";
 
-/**
- * Find all .env* files recursively in a directory that are NOT tracked by git
- * Returns paths relative to the root directory
- */
 export async function findEnvFiles(dir: string): Promise<string[]> {
   const envFiles: string[] = [];
   await findEnvFilesRecursive(dir, dir, envFiles);
@@ -22,17 +18,14 @@ async function findEnvFilesRecursive(
   for (const entry of entries) {
     const fullPath = join(currentDir, entry.name);
 
-    // Skip node_modules and .git directories
     if (entry.isDirectory()) {
       if (entry.name === "node_modules" || entry.name === ".git") {
         continue;
       }
       await findEnvFilesRecursive(rootDir, fullPath, envFiles);
     } else if (entry.isFile() && entry.name.startsWith(".env")) {
-      // Check if file is tracked by git
       const isTracked = await isFileTrackedByGit(fullPath);
       if (!isTracked) {
-        // Store path relative to root
         const relativePath = relative(rootDir, fullPath);
         envFiles.push(relativePath);
       }
@@ -40,9 +33,6 @@ async function findEnvFilesRecursive(
   }
 }
 
-/**
- * Check if a file is tracked by git (exists in the remote repo)
- */
 async function isFileTrackedByGit(filePath: string): Promise<boolean> {
   const result = await $`git ls-files --error-unmatch ${filePath}`
     .nothrow()
@@ -50,9 +40,6 @@ async function isFileTrackedByGit(filePath: string): Promise<boolean> {
   return result.exitCode === 0;
 }
 
-/**
- * Check if package.json exists in directory
- */
 export async function hasPackageJson(dir: string): Promise<boolean> {
   try {
     const stats = await stat(join(dir, "package.json"));
@@ -64,11 +51,23 @@ export async function hasPackageJson(dir: string): Promise<boolean> {
 
 export type PackageManager = "bun" | "pnpm" | "yarn" | "npm";
 
-/**
- * Detect which package manager to use based on lock files
- */
+export type RepoType = "monorepo" | "multi-project" | "single-project";
+
+export interface ProjectConfig {
+  path: string;
+  relativePath: string;
+  packageManager: PackageManager;
+  hasPackageJson: boolean;
+}
+
+export interface RepoStructure {
+  type: RepoType;
+  rootPath: string;
+  rootPackageManager?: PackageManager;
+  projects: ProjectConfig[];
+}
+
 export async function detectPackageManager(dir: string): Promise<PackageManager> {
-  // Check in order of preference
   const lockFiles: { file: string; pm: PackageManager }[] = [
     { file: "bun.lockb", pm: "bun" },
     { file: "bun.lock", pm: "bun" },
@@ -83,20 +82,147 @@ export async function detectPackageManager(dir: string): Promise<PackageManager>
       if (stats.isFile()) {
         return pm;
       }
-    } catch {
-      // File doesn't exist, continue
-    }
+    } catch {}
   }
 
-  // Default to npm if no lock file found
   return "npm";
 }
 
-/**
- * Symlink env files from source to target directory
- * Uses absolute paths so symlinks work regardless of location
- * Creates parent directories if needed
- */
+export async function detectMonorepo(dir: string): Promise<boolean> {
+  try {
+    const stats = await stat(join(dir, "pnpm-workspace.yaml"));
+    if (stats.isFile()) return true;
+  } catch {}
+
+  try {
+    const stats = await stat(join(dir, "lerna.json"));
+    if (stats.isFile()) return true;
+  } catch {}
+
+  try {
+    const pkgPath = join(dir, "package.json");
+    const stats = await stat(pkgPath);
+    if (stats.isFile()) {
+      const content = await readFile(pkgPath, "utf-8");
+      const pkg = JSON.parse(content);
+      if (pkg.workspaces) {
+        return true;
+      }
+    }
+  } catch {}
+
+  return false;
+}
+
+export async function findProjectDirectories(rootDir: string): Promise<string[]> {
+  const projects: string[] = [];
+  await findProjectDirectoriesRecursive(rootDir, rootDir, projects, 0);
+  return projects;
+}
+
+async function findProjectDirectoriesRecursive(
+  rootDir: string,
+  currentDir: string,
+  projects: string[],
+  depth: number
+): Promise<void> {
+  const maxDepth = 3;
+  if (depth > maxDepth) return;
+
+  try {
+    const entries = await readdir(currentDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+
+      const skipDirs = ["node_modules", ".git", "dist", "build", ".worktrees"];
+      if (skipDirs.includes(entry.name) || entry.name.startsWith(".")) {
+        continue;
+      }
+
+      const fullPath = join(currentDir, entry.name);
+
+      const pkgPath = join(fullPath, "package.json");
+      try {
+        const stats = await stat(pkgPath);
+        if (stats.isFile()) {
+          projects.push(fullPath);
+        }
+      } catch {}
+
+      await findProjectDirectoriesRecursive(rootDir, fullPath, projects, depth + 1);
+    }
+  } catch {}
+}
+
+export async function detectRepoStructure(dir: string): Promise<RepoStructure> {
+  const rootPath = resolve(dir);
+  const projects: ProjectConfig[] = [];
+
+  const rootHasPackageJson = await hasPackageJson(rootPath);
+  const isMonorepo = await detectMonorepo(rootPath);
+
+  if (isMonorepo) {
+    const rootPackageManager = rootHasPackageJson ? await detectPackageManager(rootPath) : undefined;
+    if (rootHasPackageJson) {
+      projects.push({
+        path: rootPath,
+        relativePath: ".",
+        packageManager: rootPackageManager!,
+        hasPackageJson: true,
+      });
+    }
+    return {
+      type: "monorepo",
+      rootPath,
+      rootPackageManager,
+      projects,
+    };
+  }
+
+  const subdirProjects = await findProjectDirectories(rootPath);
+
+  if (rootHasPackageJson) {
+    const rootPackageManager = await detectPackageManager(rootPath);
+    projects.push({
+      path: rootPath,
+      relativePath: ".",
+      packageManager: rootPackageManager,
+      hasPackageJson: true,
+    });
+  }
+
+  for (const projectPath of subdirProjects) {
+    const packageManager = await detectPackageManager(projectPath);
+    projects.push({
+      path: projectPath,
+      relativePath: relative(rootPath, projectPath),
+      packageManager,
+      hasPackageJson: true,
+    });
+  }
+
+  let type: RepoType;
+  if (projects.length === 0) {
+    type = "single-project";
+  } else if (projects.length === 1 && rootHasPackageJson && subdirProjects.length === 0) {
+    type = "single-project";
+  } else {
+    type = "multi-project";
+  }
+
+  const rootPackageManager = rootHasPackageJson ? await detectPackageManager(rootPath) : undefined;
+
+  projects.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+
+  return {
+    type,
+    rootPath,
+    rootPackageManager,
+    projects,
+  };
+}
+
 export async function symlinkEnvFiles(
   sourceDir: string,
   targetDir: string,
@@ -105,16 +231,11 @@ export async function symlinkEnvFiles(
   for (const file of files) {
     const sourcePath = resolve(sourceDir, file);
     const targetPath = join(targetDir, file);
-    // Create parent directory if it doesn't exist
     await mkdir(dirname(targetPath), { recursive: true });
     await symlink(sourcePath, targetPath);
   }
 }
 
-/**
- * Copy env files from source to target directory
- * Creates parent directories if needed
- */
 export async function copyEnvFiles(
   sourceDir: string,
   targetDir: string,
@@ -123,7 +244,6 @@ export async function copyEnvFiles(
   for (const file of files) {
     const sourcePath = join(sourceDir, file);
     const targetPath = join(targetDir, file);
-    // Create parent directory if it doesn't exist
     await mkdir(dirname(targetPath), { recursive: true });
     await copyFile(sourcePath, targetPath);
   }

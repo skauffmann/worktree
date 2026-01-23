@@ -19,6 +19,9 @@ import {
   copyEnvFiles,
   findGeneratedFiles,
   copyGeneratedFiles,
+  detectMonorepo,
+  findProjectDirectories,
+  detectRepoStructure,
 } from "./files";
 
 describe("files", () => {
@@ -464,6 +467,245 @@ describe("files", () => {
 
       expect(content1).toBe("folder");
       expect(content2).toBe("file");
+    });
+  });
+
+  describe("detectMonorepo", () => {
+    test("should detect pnpm-workspace.yaml", async () => {
+      await writeFile(join(testDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'");
+
+      const isMonorepo = await detectMonorepo(testDir);
+
+      expect(isMonorepo).toBe(true);
+    });
+
+    test("should detect lerna.json", async () => {
+      await writeFile(join(testDir, "lerna.json"), '{"version": "1.0.0"}');
+
+      const isMonorepo = await detectMonorepo(testDir);
+
+      expect(isMonorepo).toBe(true);
+    });
+
+    test("should detect package.json with workspaces array", async () => {
+      await writeFile(
+        join(testDir, "package.json"),
+        JSON.stringify({ workspaces: ["packages/*"] })
+      );
+
+      const isMonorepo = await detectMonorepo(testDir);
+
+      expect(isMonorepo).toBe(true);
+    });
+
+    test("should detect package.json with workspaces object", async () => {
+      await writeFile(
+        join(testDir, "package.json"),
+        JSON.stringify({ workspaces: { packages: ["packages/*"] } })
+      );
+
+      const isMonorepo = await detectMonorepo(testDir);
+
+      expect(isMonorepo).toBe(true);
+    });
+
+    test("should return false when no monorepo indicators exist", async () => {
+      await writeFile(join(testDir, "package.json"), JSON.stringify({ name: "test" }));
+
+      const isMonorepo = await detectMonorepo(testDir);
+
+      expect(isMonorepo).toBe(false);
+    });
+
+    test("should return false when no files exist", async () => {
+      const isMonorepo = await detectMonorepo(testDir);
+
+      expect(isMonorepo).toBe(false);
+    });
+  });
+
+  describe("findProjectDirectories", () => {
+    test("should find immediate subdirectory projects", async () => {
+      await mkdir(join(testDir, "frontend"));
+      await writeFile(join(testDir, "frontend", "package.json"), "{}");
+      await mkdir(join(testDir, "backend"));
+      await writeFile(join(testDir, "backend", "package.json"), "{}");
+
+      const projects = await findProjectDirectories(testDir);
+
+      expect(projects).toContain(join(testDir, "frontend"));
+      expect(projects).toContain(join(testDir, "backend"));
+      expect(projects).toHaveLength(2);
+    });
+
+    test("should find nested projects (2-3 levels)", async () => {
+      await mkdir(join(testDir, "apps", "web"), { recursive: true });
+      await writeFile(join(testDir, "apps", "web", "package.json"), "{}");
+      await mkdir(join(testDir, "packages", "ui", "components"), { recursive: true });
+      await writeFile(join(testDir, "packages", "ui", "components", "package.json"), "{}");
+
+      const projects = await findProjectDirectories(testDir);
+
+      expect(projects).toContain(join(testDir, "apps", "web"));
+      expect(projects).toContain(join(testDir, "packages", "ui", "components"));
+    });
+
+    test("should skip node_modules directory", async () => {
+      await mkdir(join(testDir, "node_modules", "some-package"), { recursive: true });
+      await writeFile(join(testDir, "node_modules", "some-package", "package.json"), "{}");
+
+      const projects = await findProjectDirectories(testDir);
+
+      expect(projects).not.toContain(join(testDir, "node_modules", "some-package"));
+      expect(projects).toHaveLength(0);
+    });
+
+    test("should skip .git directory", async () => {
+      await mkdir(join(testDir, ".git", "subdir"), { recursive: true });
+      await writeFile(join(testDir, ".git", "subdir", "package.json"), "{}");
+
+      const projects = await findProjectDirectories(testDir);
+
+      expect(projects).toHaveLength(0);
+    });
+
+    test("should skip hidden directories", async () => {
+      await mkdir(join(testDir, ".hidden"));
+      await writeFile(join(testDir, ".hidden", "package.json"), "{}");
+
+      const projects = await findProjectDirectories(testDir);
+
+      expect(projects).toHaveLength(0);
+    });
+
+    test("should skip dist and build directories", async () => {
+      await mkdir(join(testDir, "dist"));
+      await writeFile(join(testDir, "dist", "package.json"), "{}");
+      await mkdir(join(testDir, "build"));
+      await writeFile(join(testDir, "build", "package.json"), "{}");
+
+      const projects = await findProjectDirectories(testDir);
+
+      expect(projects).toHaveLength(0);
+    });
+
+    test("should handle empty directories", async () => {
+      await mkdir(join(testDir, "empty"));
+
+      const projects = await findProjectDirectories(testDir);
+
+      expect(projects).toHaveLength(0);
+    });
+
+    test("should respect max depth", async () => {
+      await mkdir(join(testDir, "a", "b", "c", "d", "e"), { recursive: true });
+      await writeFile(join(testDir, "a", "b", "c", "d", "e", "package.json"), "{}");
+
+      const projects = await findProjectDirectories(testDir);
+
+      expect(projects).not.toContain(join(testDir, "a", "b", "c", "d", "e"));
+    });
+  });
+
+  describe("detectRepoStructure", () => {
+    test("should detect monorepo correctly", async () => {
+      await writeFile(join(testDir, "package.json"), "{}");
+      await writeFile(join(testDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'");
+      await writeFile(join(testDir, "pnpm-lock.yaml"), "");
+
+      const structure = await detectRepoStructure(testDir);
+
+      expect(structure.type).toBe("monorepo");
+      expect(structure.projects).toHaveLength(1);
+      expect(structure.projects[0]!.relativePath).toBe(".");
+      expect(structure.rootPackageManager).toBe("pnpm");
+    });
+
+    test("should detect single-project with root package.json", async () => {
+      await writeFile(join(testDir, "package.json"), "{}");
+      await writeFile(join(testDir, "package-lock.json"), "{}");
+
+      const structure = await detectRepoStructure(testDir);
+
+      expect(structure.type).toBe("single-project");
+      expect(structure.projects).toHaveLength(1);
+      expect(structure.projects[0]!.relativePath).toBe(".");
+      expect(structure.projects[0]!.packageManager).toBe("npm");
+      expect(structure.rootPackageManager).toBe("npm");
+    });
+
+    test("should detect multi-project with subdirectories", async () => {
+      await mkdir(join(testDir, "frontend"));
+      await writeFile(join(testDir, "frontend", "package.json"), "{}");
+      await writeFile(join(testDir, "frontend", "yarn.lock"), "");
+      await mkdir(join(testDir, "backend"));
+      await writeFile(join(testDir, "backend", "package.json"), "{}");
+      await writeFile(join(testDir, "backend", "pnpm-lock.yaml"), "");
+
+      const structure = await detectRepoStructure(testDir);
+
+      expect(structure.type).toBe("multi-project");
+      expect(structure.projects).toHaveLength(2);
+      expect(structure.projects[0]!.relativePath).toBe("backend");
+      expect(structure.projects[0]!.packageManager).toBe("pnpm");
+      expect(structure.projects[1]!.relativePath).toBe("frontend");
+      expect(structure.projects[1]!.packageManager).toBe("yarn");
+    });
+
+    test("should populate correct package manager per project", async () => {
+      await mkdir(join(testDir, "project1"));
+      await writeFile(join(testDir, "project1", "package.json"), "{}");
+      await writeFile(join(testDir, "project1", "bun.lockb"), "");
+      await mkdir(join(testDir, "project2"));
+      await writeFile(join(testDir, "project2", "package.json"), "{}");
+      await writeFile(join(testDir, "project2", "package-lock.json"), "{}");
+
+      const structure = await detectRepoStructure(testDir);
+
+      expect(structure.type).toBe("multi-project");
+      expect(structure.projects).toHaveLength(2);
+      expect(structure.projects[0]!.relativePath).toBe("project1");
+      expect(structure.projects[0]!.packageManager).toBe("bun");
+      expect(structure.projects[1]!.relativePath).toBe("project2");
+      expect(structure.projects[1]!.packageManager).toBe("npm");
+    });
+
+    test("should handle repos with no package.json", async () => {
+      const structure = await detectRepoStructure(testDir);
+
+      expect(structure.type).toBe("single-project");
+      expect(structure.projects).toHaveLength(0);
+      expect(structure.rootPackageManager).toBeUndefined();
+    });
+
+    test("should include root + subdirectories in multi-project", async () => {
+      await writeFile(join(testDir, "package.json"), "{}");
+      await writeFile(join(testDir, "bun.lockb"), "");
+      await mkdir(join(testDir, "packages", "lib1"), { recursive: true });
+      await writeFile(join(testDir, "packages", "lib1", "package.json"), "{}");
+      await writeFile(join(testDir, "packages", "lib1", "package-lock.json"), "{}");
+
+      const structure = await detectRepoStructure(testDir);
+
+      expect(structure.type).toBe("multi-project");
+      expect(structure.projects).toHaveLength(2);
+      expect(structure.projects[0]!.relativePath).toBe(".");
+      expect(structure.projects[0]!.packageManager).toBe("bun");
+      expect(structure.projects[1]!.relativePath).toBe(join("packages", "lib1"));
+      expect(structure.projects[1]!.packageManager).toBe("npm");
+    });
+
+    test("should not treat root + subdirs as multi-project if monorepo", async () => {
+      await writeFile(join(testDir, "package.json"), JSON.stringify({ workspaces: ["packages/*"] }));
+      await writeFile(join(testDir, "yarn.lock"), "");
+      await mkdir(join(testDir, "packages", "lib1"), { recursive: true });
+      await writeFile(join(testDir, "packages", "lib1", "package.json"), "{}");
+
+      const structure = await detectRepoStructure(testDir);
+
+      expect(structure.type).toBe("monorepo");
+      expect(structure.projects).toHaveLength(1);
+      expect(structure.projects[0]!.relativePath).toBe(".");
     });
   });
 });
