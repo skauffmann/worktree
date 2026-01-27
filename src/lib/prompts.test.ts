@@ -1,5 +1,5 @@
 import { describe, test, expect, mock, spyOn, beforeEach, afterEach } from "bun:test";
-import * as p from "@clack/prompts";
+import * as ui from "../components/ui.tsx";
 
 describe("prompts", () => {
   let originalExit: typeof process.exit;
@@ -20,35 +20,27 @@ describe("prompts", () => {
   describe("handleCancel", () => {
     test("should call process.exit(0) when value is a cancel symbol", async () => {
       const { handleCancel } = await import("./prompts");
-      const cancelValue = Symbol.for("clack:cancel");
+      const cancelValue = ui.CANCEL_SYMBOL;
 
-      const isCancel = spyOn(p, "isCancel").mockReturnValue(true);
-      const cancel = spyOn(p, "cancel").mockImplementation(() => {});
+      const cancelMock = spyOn(ui, "cancel").mockImplementation(() => {});
 
       try {
         handleCancel(cancelValue);
       } catch (e) {}
 
-      expect(isCancel).toHaveBeenCalledWith(cancelValue);
-      expect(cancel).toHaveBeenCalledWith("Operation cancelled.");
+      expect(cancelMock).toHaveBeenCalledWith("Operation cancelled.");
       expect(exitMock).toHaveBeenCalledWith(0);
 
-      isCancel.mockRestore();
-      cancel.mockRestore();
+      cancelMock.mockRestore();
     });
 
     test("should not exit when value is not a cancel symbol", async () => {
       const { handleCancel } = await import("./prompts");
       const normalValue = "some value";
 
-      const isCancel = spyOn(p, "isCancel").mockReturnValue(false);
-
       handleCancel(normalValue);
 
-      expect(isCancel).toHaveBeenCalledWith(normalValue);
       expect(exitMock).not.toHaveBeenCalled();
-
-      isCancel.mockRestore();
     });
   });
 
@@ -57,8 +49,7 @@ describe("prompts", () => {
       const { promptText } = await import("./prompts");
       const expectedValue = "user input";
 
-      const textMock = spyOn(p, "text").mockResolvedValue(expectedValue);
-      const isCancel = spyOn(p, "isCancel").mockReturnValue(false);
+      const textMock = spyOn(ui, "text").mockResolvedValue(expectedValue);
 
       const result = await promptText({ message: "Enter text:" });
 
@@ -66,16 +57,13 @@ describe("prompts", () => {
       expect(textMock).toHaveBeenCalledWith({ message: "Enter text:" });
 
       textMock.mockRestore();
-      isCancel.mockRestore();
     });
 
     test("should exit when user cancels text prompt", async () => {
       const { promptText } = await import("./prompts");
-      const cancelSymbol = Symbol.for("clack:cancel");
 
-      const textMock = spyOn(p, "text").mockResolvedValue(cancelSymbol);
-      const isCancel = spyOn(p, "isCancel").mockReturnValue(true);
-      const cancel = spyOn(p, "cancel").mockImplementation(() => {});
+      const textMock = spyOn(ui, "text").mockResolvedValue(ui.CANCEL_SYMBOL);
+      const cancelMock = spyOn(ui, "cancel").mockImplementation(() => {});
 
       try {
         await promptText({ message: "Enter text:" });
@@ -84,8 +72,7 @@ describe("prompts", () => {
       expect(exitMock).toHaveBeenCalledWith(0);
 
       textMock.mockRestore();
-      isCancel.mockRestore();
-      cancel.mockRestore();
+      cancelMock.mockRestore();
     });
   });
 
@@ -93,8 +80,7 @@ describe("prompts", () => {
     test("should return true when user confirms", async () => {
       const { promptConfirm } = await import("./prompts");
 
-      const confirmMock = spyOn(p, "confirm").mockResolvedValue(true);
-      const isCancel = spyOn(p, "isCancel").mockReturnValue(false);
+      const confirmMock = spyOn(ui, "confirm").mockResolvedValue(true);
 
       const result = await promptConfirm({ message: "Confirm?" });
 
@@ -102,30 +88,25 @@ describe("prompts", () => {
       expect(confirmMock).toHaveBeenCalledWith({ message: "Confirm?" });
 
       confirmMock.mockRestore();
-      isCancel.mockRestore();
     });
 
     test("should return false when user declines", async () => {
       const { promptConfirm } = await import("./prompts");
 
-      const confirmMock = spyOn(p, "confirm").mockResolvedValue(false);
-      const isCancel = spyOn(p, "isCancel").mockReturnValue(false);
+      const confirmMock = spyOn(ui, "confirm").mockResolvedValue(false);
 
       const result = await promptConfirm({ message: "Confirm?" });
 
       expect(result).toBe(false);
 
       confirmMock.mockRestore();
-      isCancel.mockRestore();
     });
 
     test("should exit when user cancels confirm prompt", async () => {
       const { promptConfirm } = await import("./prompts");
-      const cancelSymbol = Symbol.for("clack:cancel");
 
-      const confirmMock = spyOn(p, "confirm").mockResolvedValue(cancelSymbol);
-      const isCancel = spyOn(p, "isCancel").mockReturnValue(true);
-      const cancel = spyOn(p, "cancel").mockImplementation(() => {});
+      const confirmMock = spyOn(ui, "confirm").mockResolvedValue(ui.CANCEL_SYMBOL);
+      const cancelMock = spyOn(ui, "cancel").mockImplementation(() => {});
 
       try {
         await promptConfirm({ message: "Confirm?" });
@@ -134,8 +115,7 @@ describe("prompts", () => {
       expect(exitMock).toHaveBeenCalledWith(0);
 
       confirmMock.mockRestore();
-      isCancel.mockRestore();
-      cancel.mockRestore();
+      cancelMock.mockRestore();
     });
   });
 
@@ -143,8 +123,7 @@ describe("prompts", () => {
     test("should return selected value", async () => {
       const { promptSelect } = await import("./prompts");
 
-      const selectMock = spyOn(p, "select").mockResolvedValue("option1");
-      const isCancel = spyOn(p, "isCancel").mockReturnValue(false);
+      const selectMock = spyOn(ui, "select").mockResolvedValue("option1");
 
       const result = await promptSelect<"option1" | "option2">({
         message: "Select:",
@@ -157,16 +136,13 @@ describe("prompts", () => {
       expect(result).toBe("option1");
 
       selectMock.mockRestore();
-      isCancel.mockRestore();
     });
 
     test("should exit when user cancels select prompt", async () => {
       const { promptSelect } = await import("./prompts");
-      const cancelSymbol = Symbol.for("clack:cancel");
 
-      const selectMock = spyOn(p, "select").mockResolvedValue(cancelSymbol);
-      const isCancel = spyOn(p, "isCancel").mockReturnValue(true);
-      const cancel = spyOn(p, "cancel").mockImplementation(() => {});
+      const selectMock = spyOn(ui, "select").mockResolvedValue(ui.CANCEL_SYMBOL);
+      const cancelMock = spyOn(ui, "cancel").mockImplementation(() => {});
 
       try {
         await promptSelect({
@@ -178,8 +154,46 @@ describe("prompts", () => {
       expect(exitMock).toHaveBeenCalledWith(0);
 
       selectMock.mockRestore();
-      isCancel.mockRestore();
-      cancel.mockRestore();
+      cancelMock.mockRestore();
+    });
+  });
+
+  describe("promptMultiselect", () => {
+    test("should return selected values", async () => {
+      const { promptMultiselect } = await import("./prompts");
+
+      const multiselectMock = spyOn(ui, "multiselect").mockResolvedValue(["option1", "option2"]);
+
+      const result = await promptMultiselect<string>({
+        message: "Select:",
+        options: [
+          { value: "option1", label: "Option 1" },
+          { value: "option2", label: "Option 2" },
+        ],
+      });
+
+      expect(result).toEqual(["option1", "option2"]);
+
+      multiselectMock.mockRestore();
+    });
+
+    test("should exit when user cancels multiselect prompt", async () => {
+      const { promptMultiselect } = await import("./prompts");
+
+      const multiselectMock = spyOn(ui, "multiselect").mockResolvedValue(ui.CANCEL_SYMBOL);
+      const cancelMock = spyOn(ui, "cancel").mockImplementation(() => {});
+
+      try {
+        await promptMultiselect({
+          message: "Select:",
+          options: [{ value: "option1", label: "Option 1" }],
+        });
+      } catch (e) {}
+
+      expect(exitMock).toHaveBeenCalledWith(0);
+
+      multiselectMock.mockRestore();
+      cancelMock.mockRestore();
     });
   });
 });

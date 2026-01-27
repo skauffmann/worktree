@@ -1,6 +1,5 @@
 import { findGeneratedFiles } from "../lib/files";
-import { handleCancel } from "../lib/prompts";
-import * as p from "@clack/prompts";
+import { promptMultiselect, ui } from "../lib/prompts";
 
 export interface GeneratedFilesResult {
   generatedFiles: string[];
@@ -16,12 +15,12 @@ export async function promptGeneratedFiles(
     return { generatedFiles: [], shouldCopy: false };
   }
 
-  p.note(
+  ui.note(
     `Found ${generatedFiles.length} gitignored file(s)/folder(s) with "generated" in name or ".gen" extension`,
     "Generated Files"
   );
 
-  const selected = await p.multiselect({
+  const selected = await promptMultiselect<string>({
     message: "Select generated files/folders to copy to new worktree:",
     options: generatedFiles.map((file) => ({
       value: file,
@@ -31,14 +30,12 @@ export async function promptGeneratedFiles(
     required: false,
   });
 
-  handleCancel(selected);
-
-  if (Array.isArray(selected) && selected.length === 0) {
+  if (selected.length === 0) {
     return { generatedFiles: [], shouldCopy: false };
   }
 
   return {
-    generatedFiles: selected as string[],
+    generatedFiles: selected,
     shouldCopy: true,
   };
 }

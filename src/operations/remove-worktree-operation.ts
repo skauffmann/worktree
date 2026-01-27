@@ -1,16 +1,16 @@
 import { removeWorktree } from "../lib/git";
-import * as p from "@clack/prompts";
+import { ui } from "../lib/prompts.ts";
 
 export async function removeWorktreeOperation(path: string): Promise<void> {
-  const spinner = p.spinner();
+  const spinner = ui.spinner();
   spinner.start("Removing worktree...");
   const result = await removeWorktree(path);
   if (result.success) {
     spinner.stop("Worktree removed successfully.");
-    p.outro("Worktree deleted.");
+    ui.outro("Worktree deleted.");
   } else {
     spinner.stop("Failed to remove worktree.");
-    p.cancel(result.error || "Unknown error");
+    ui.cancel(result.error || "Unknown error");
     process.exit(1);
   }
 }

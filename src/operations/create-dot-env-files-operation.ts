@@ -1,8 +1,8 @@
 import { symlinkEnvFiles, copyEnvFiles } from "../lib/files";
-import * as p from "@clack/prompts";
+import { ui } from "../lib/prompts.ts";
 
 export async function createDotEnvFilesOperation(mainRepoPath: string, worktreePath: string, envFiles: string[], type: "symlink" | "copy"): Promise<void> {
-  const spinner = p.spinner();
+  const spinner = ui.spinner();
   spinner.start(
     `${type === "symlink" ? "Symlinking" : "Copying"} env files...`
   );
@@ -15,6 +15,6 @@ export async function createDotEnvFilesOperation(mainRepoPath: string, worktreeP
     spinner.stop("Env files handled.");
   } catch (err) {
     spinner.stop(`Warning: Failed to ${type} env files.`);
-    p.note(String(err), "Error");
+    ui.note(String(err), "Error");
   }
 }

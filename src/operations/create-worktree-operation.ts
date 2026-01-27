@@ -1,8 +1,8 @@
 import { createWorktree } from "../lib/git";
-import * as p from "@clack/prompts";
+import { ui } from "../lib/prompts.ts";
 
 export async function createWorktreeOperation(path: string, branch: string, shouldCreateBranch: boolean = true, baseBranch?: string): Promise<void> {
-  const spinner = p.spinner();
+  const spinner = ui.spinner();
   spinner.start("Creating worktree...");
 
   const createResult = await createWorktree(
@@ -14,7 +14,7 @@ export async function createWorktreeOperation(path: string, branch: string, shou
 
   if (!createResult.success) {
     spinner.stop("Failed to create worktree.");
-    p.cancel(createResult.error || "Unknown error");
+    ui.cancel(createResult.error || "Unknown error");
     process.exit(1);
   }
   spinner.stop("Worktree created.");

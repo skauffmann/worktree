@@ -1,26 +1,26 @@
 import { detectEditor, openInEditor } from "../lib/editor";
 import { $ } from "bun";
-import * as p from "@clack/prompts";
+import { ui } from "../lib/prompts.ts";
 
 export async function openInEditorOperation(path: string): Promise<void> {
-  const spinner = p.spinner();
+  const spinner = ui.spinner();
   spinner.start("Opening in editor...");
   const editor = await detectEditor();
 
   if (!editor) {
     await openInFileExplorer(path);
     spinner.stop("Opened in file explorer.");
-    p.note(
+    ui.note(
       "Set WORKTREE_EDITOR or install cursor/code/zed.",
       "No editor found"
     );
-    p.outro(`Worktree: ${path}`);
+    ui.outro(`Worktree: ${path}`);
     return;
   }
 
   await openInEditor(editor, path);
   spinner.stop("Opened in editor.");
-  p.outro(`Worktree: ${path}`);
+  ui.outro(`Worktree: ${path}`);
 }
 
 async function openInFileExplorer(path: string): Promise<void> {

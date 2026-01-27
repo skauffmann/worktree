@@ -1,6 +1,5 @@
 import { findEnvFiles } from "../lib/files";
-import { promptSelect } from "../lib/prompts";
-import * as p from "@clack/prompts";
+import { promptSelect, ui } from "../lib/prompts";
 
 export type EnvFileAction = "symlink" | "copy" | "nothing";
 
@@ -12,7 +11,7 @@ export interface EnvFileActionResult {
 export async function promptDotEnvFiles(path: string): Promise<EnvFileActionResult> {
   const envFiles = await findEnvFiles(path);
   if (envFiles.length > 0) {
-    p.note(
+    ui.note(
       `Found ${envFiles.length} env file(s): ${envFiles.join(", ")}`,
       "Environment Files"
     );

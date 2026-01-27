@@ -1,18 +1,18 @@
 import { copyGeneratedFiles } from "../lib/files";
-import * as p from "@clack/prompts";
+import { ui } from "../lib/prompts.ts";
 
 export async function copyGeneratedFilesOperation(
   mainRepoPath: string,
   worktreePath: string,
   generatedFiles: string[]
 ): Promise<void> {
-  const spinner = p.spinner();
+  const spinner = ui.spinner();
   spinner.start("Copying generated files...");
   try {
     await copyGeneratedFiles(mainRepoPath, worktreePath, generatedFiles);
     spinner.stop("Generated files copied.");
   } catch (err) {
     spinner.stop("Warning: Failed to copy generated files.");
-    p.note(String(err), "Error");
+    ui.note(String(err), "Error");
   }
 }

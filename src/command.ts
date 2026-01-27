@@ -1,4 +1,4 @@
-import * as p from "@clack/prompts";
+import { ui } from "./lib/prompts.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { getCurrentBranch, getCurrentWorktreePath, getMainRepoPath, getRepoName, isInsideGitRepo, isInsideWorktree, type WorktreeInfo } from "./lib/git";
@@ -25,7 +25,7 @@ import { promptWorktreeSource } from "./prompts/prompt-worktree-source";
 export async function worktreeCommand(branchArg?: string): Promise<void> {
   const isGitRepo = await isInsideGitRepo();
   if (!isGitRepo) {
-    p.cancel("Not inside a git repository.");
+    ui.cancel("Not inside a git repository.");
     process.exit(1);
   }
 
@@ -65,7 +65,7 @@ async function handleNewWorktree(defaultBranchName?: string, baseBranchOverride?
     const action = await promptExistingPathAction(worktreePath);
 
     if (action === "cancel") {
-      p.outro("Operation cancelled.");
+      ui.outro("Operation cancelled.");
       return;
     }
 
@@ -116,14 +116,14 @@ async function handleNewWorktree(defaultBranchName?: string, baseBranchOverride?
     await installDependenciesOperation(mainRepoPath, worktreePath);
   }
 
-  p.outro(`Worktree ready at: ${worktreePath}`);
+  ui.outro(`Worktree ready at: ${worktreePath}`);
 }
 
 async function handleExistingWorktree(defaultWorktree?: WorktreeInfo | null, defaultBranchName?: string): Promise<void> {
   const path = defaultWorktree?.path ?? await getCurrentWorktreePath();
   const branch = defaultWorktree?.branch ?? await getCurrentBranch();
 
-  p.note(
+  ui.note(
     `Path: ${path}\nBranch: ${branch || "detached"}`,
     !defaultWorktree ? "You are inside a linked worktree" : undefined
   );
@@ -141,7 +141,7 @@ async function handleExistingWorktree(defaultWorktree?: WorktreeInfo | null, def
   const action = await promptExistingPathAction(path);
 
   if (action === "cancel") {
-    p.outro("Operation cancelled.");
+    ui.outro("Operation cancelled.");
     return;
   }
 

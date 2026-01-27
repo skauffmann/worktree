@@ -1,8 +1,8 @@
-import * as p from "@clack/prompts";
+import { ui } from "../lib/prompts.ts";
 import { detectTerminal, openInTerminal } from "../lib/terminal";
 
 export async function openInTerminalOperation(path: string, title?: string): Promise<void> {
-  const spinner = p.spinner();
+  const spinner = ui.spinner();
   const terminal = detectTerminal();
 
   spinner.start(`Opening in ${formatTerminalName(terminal.name)}...`);
@@ -11,7 +11,7 @@ export async function openInTerminalOperation(path: string, title?: string): Pro
 
   if (!success) {
     spinner.stop("Failed to open terminal.");
-    p.note(
+    ui.note(
       "Could not open a new terminal tab automatically.",
       "Terminal not supported"
     );

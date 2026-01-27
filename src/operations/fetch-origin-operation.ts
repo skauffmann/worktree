@@ -1,8 +1,8 @@
 import { gitFetch } from "../lib/git";
-import * as p from "@clack/prompts";
+import { ui } from "../lib/prompts.ts";
 
 export async function fetchOriginOperation(): Promise<void> {
-  const spinner = p.spinner();
+  const spinner = ui.spinner();
   spinner.start("Fetching from origin...");
 
   const result = await gitFetch();

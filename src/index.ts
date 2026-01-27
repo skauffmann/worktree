@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import * as p from "@clack/prompts";
+import { ui } from "./lib/prompts.ts";
 import { worktreeCommand } from "./command.ts";
 import { checkForUpdate, detectInstalledVia, getUpdateCommand } from "./lib/version.ts";
 
@@ -17,11 +17,11 @@ async function main() {
     }
   }
 
-  p.intro(intro.join(" "));
+  ui.intro(intro.join(" "));
 
   if (version?.updateAvailable) {
     const updateCmd = getUpdateCommand(detectInstalledVia());
-    p.note(
+    ui.note(
       `Current: ${version.currentVersion}\nLatest:  ${version.latestVersion}\n\nRun: ${updateCmd}`,
       "Update available"
     );

@@ -1,15 +1,14 @@
 import { detectPackageManager, detectRepoStructure } from "../lib/files";
-import * as p from "@clack/prompts";
+import { ui } from "../lib/prompts.ts";
 import { $ } from "bun";
 import { join } from "node:path";
 
 export async function installDependenciesOperation(mainRepoPath: string, worktreePath: string): Promise<void> {
-  const spinner = p.spinner();
-
   const repoStructure = await detectRepoStructure(mainRepoPath);
 
   if (repoStructure.type === "single-project" || repoStructure.type === "monorepo") {
     const pm = await detectPackageManager(mainRepoPath);
+    const spinner = ui.spinner();
     spinner.start(`Installing dependencies with ${pm}...`);
     const installResult = await $`cd ${worktreePath} && ${pm} install`
       .nothrow()
@@ -28,6 +27,7 @@ export async function installDependenciesOperation(mainRepoPath: string, worktre
     for (const project of repoStructure.projects) {
       const projectName = project.relativePath === "." ? "root" : project.relativePath;
 
+      const spinner = ui.spinner();
       spinner.start(`Installing dependencies [${projectNum}/${totalProjects}]: ${projectName}...`);
 
       const projectWorktreePath = join(worktreePath, project.relativePath);
@@ -46,9 +46,9 @@ export async function installDependenciesOperation(mainRepoPath: string, worktre
     }
 
     if (failureCount === 0) {
-      p.log.success(`All dependencies installed in ${successCount} project(s).`);
+      ui.log.success(`All dependencies installed in ${successCount} project(s).`);
     } else {
-      p.log.warning(`Dependencies installed: ${successCount} succeeded, ${failureCount} failed.`);
+      ui.log.warning(`Dependencies installed: ${successCount} succeeded, ${failureCount} failed.`);
     }
   }
 }
