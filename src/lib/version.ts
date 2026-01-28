@@ -1,11 +1,6 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join, dirname } from "node:path";
 
 const PACKAGE_NAME = "@skauffmann/worktree";
 const NPM_REGISTRY_URL = `https://registry.npmjs.org/${PACKAGE_NAME}/latest`;
-const CACHE_FILE_PATH = join(homedir(), ".worktree");
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const FETCH_TIMEOUT_MS = 2000;
 
 export interface VersionCheckResult {
@@ -14,10 +9,6 @@ export interface VersionCheckResult {
   updateAvailable: boolean;
 }
 
-interface VersionCache {
-  lastCheck: number;
-  latestVersion: string;
-}
 
 export function getCurrentVersion(): string {
   // Use require to get version from package.json at runtime
@@ -69,44 +60,6 @@ export async function fetchLatestVersion(): Promise<{
   }
 }
 
-async function readCache(): Promise<VersionCache | null> {
-  try {
-    const content = await readFile(CACHE_FILE_PATH, "utf-8");
-    const cache = JSON.parse(content) as VersionCache;
-    if (typeof cache.lastCheck === "number" && typeof cache.latestVersion === "string") {
-      return cache;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-async function writeCache(cache: VersionCache): Promise<void> {
-  try {
-    await mkdir(dirname(CACHE_FILE_PATH), { recursive: true });
-    await writeFile(CACHE_FILE_PATH, JSON.stringify(cache), "utf-8");
-  } catch {
-    // Ignore write errors
-  }
-}
-
-async function shouldCheckVersion(): Promise<{
-  shouldCheck: boolean;
-  cachedVersion?: string;
-}> {
-  const cache = await readCache();
-  if (!cache) {
-    return { shouldCheck: true };
-  }
-
-  const age = Date.now() - cache.lastCheck;
-  if (age > CACHE_TTL_MS) {
-    return { shouldCheck: true };
-  }
-
-  return { shouldCheck: false, cachedVersion: cache.latestVersion };
-}
 
 export async function checkForUpdate(): Promise<VersionCheckResult | null> {
   if (process.env.WORKTREE_SKIP_UPDATE_CHECK) {
@@ -114,24 +67,16 @@ export async function checkForUpdate(): Promise<VersionCheckResult | null> {
   }
 
   const currentVersion = getCurrentVersion();
-  const { shouldCheck, cachedVersion } = await shouldCheckVersion();
-  let latestVersion: string;
+  const result = await fetchLatestVersion();
 
-  if (shouldCheck) {
-    const result = await fetchLatestVersion();
-    if (!result.success || !result.version) {
-      return null;
-    }
-    latestVersion = result.version;
-    await writeCache({ lastCheck: Date.now(), latestVersion });
-  } else {
-    latestVersion = cachedVersion!;
+  if (!result.success || !result.version) {
+    return null;
   }
 
-  const updateAvailable = isNewerVersion(currentVersion, latestVersion);
+  const updateAvailable = isNewerVersion(currentVersion, result.version);
   return {
     currentVersion,
-    latestVersion,
+    latestVersion: result.version,
     updateAvailable,
   };
 }
