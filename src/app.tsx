@@ -10,6 +10,8 @@ import { Confirm } from './ui/confirm.tsx';
 import { Select } from './ui/select.tsx';
 import { Operations, type Operation } from './ui/operations.tsx';
 import { Version } from './ui/version.tsx';
+import { ConfigSummary } from './ui/config-summary.tsx';
+import { SaveConfig } from './ui/save-config.tsx';
 import {
   isInsideGitRepo,
   getRepoName,
@@ -33,6 +35,13 @@ import {
 } from './lib/files.ts';
 import { detectEditor, openInEditor } from './lib/editor.ts';
 import { detectTerminal, openInTerminal } from './lib/terminal.ts';
+import {
+  loadConfig,
+  getRepoConfig,
+  saveRepoConfig,
+  type Config,
+  type DefaultValues,
+} from './lib/config.ts';
 import { $ } from 'bun';
 
 type EnvAction = 'symlink' | 'copy' | 'nothing';
@@ -40,6 +49,7 @@ type EnvAction = 'symlink' | 'copy' | 'nothing';
 type Step =
   | { type: 'loading' }
   | { type: 'not-git-repo' }
+  | { type: 'config-summary'; defaults: DefaultValues }
   | { type: 'select-worktree' }
   | { type: 'worktree-actions'; worktree: WorktreeInfo }
   | { type: 'branch-check'; branchName: string }
@@ -50,6 +60,7 @@ type Step =
   | { type: 'open-editor' }
   | { type: 'open-terminal' }
   | { type: 'operations' }
+  | { type: 'save-config' }
   | { type: 'done'; message: string }
   | { type: 'cancelled' };
 
@@ -63,10 +74,14 @@ interface Context {
   envFiles: string[];
   envAction: EnvAction;
   generatedFiles: string[];
+  shouldCopyGeneratedFiles: boolean;
   shouldInstallDeps: boolean;
   shouldOpenEditor: boolean;
   shouldOpenTerminal: boolean;
   actionOnExisting: WorktreeAction | null;
+  savedConfig: Config | null;
+  usingDefaults: boolean;
+  preferredTerminal: string | null;
 }
 
 function createInitialContext(): Context {
@@ -80,10 +95,14 @@ function createInitialContext(): Context {
     envFiles: [],
     envAction: 'nothing',
     generatedFiles: [],
+    shouldCopyGeneratedFiles: false,
     shouldInstallDeps: true,
     shouldOpenEditor: true,
     shouldOpenTerminal: true,
     actionOnExisting: null,
+    savedConfig: null,
+    usingDefaults: false,
+    preferredTerminal: null,
   };
 }
 
@@ -99,11 +118,24 @@ export function App() {
         setStep({ type: 'not-git-repo' });
         return;
       }
-      const [repoName, mainRepoPath] = await Promise.all([
+      const [repoName, mainRepoPath, configResult] = await Promise.all([
         getRepoName(),
         getMainRepoPath(),
+        loadConfig(),
       ]);
-      setCtx((prev) => ({ ...prev, repoName, mainRepoPath }));
+
+      const savedConfig = configResult.success ? configResult.config : null;
+      const repoConfig = getRepoConfig(savedConfig, repoName);
+      const preferredTerminal = savedConfig?.terminal || null;
+
+      setCtx((prev) => ({
+        ...prev,
+        repoName,
+        mainRepoPath,
+        savedConfig,
+        preferredTerminal,
+      }));
+
       setStep({ type: 'select-worktree' });
     }
     init();
@@ -117,6 +149,24 @@ export function App() {
   }, [step.type, exit]);
 
   const handleCancel = () => setStep({ type: 'cancelled' });
+
+  const handleConfigSummary = async (useDefaults: boolean) => {
+    if (useDefaults && step.type === 'config-summary') {
+      const defaults = step.defaults;
+      setCtx((prev) => ({
+        ...prev,
+        usingDefaults: true,
+        envAction: defaults.dotEnvAction || prev.envAction,
+        shouldCopyGeneratedFiles: defaults.copyGeneratedFiles ?? false,
+        shouldInstallDeps: defaults.installDependencies ?? prev.shouldInstallDeps,
+        shouldOpenEditor: defaults.openInEditor ?? prev.shouldOpenEditor,
+        shouldOpenTerminal: defaults.openInTerminal ?? prev.shouldOpenTerminal,
+      }));
+      await prepareFilesAndProceed();
+    } else {
+      await checkEnvFiles();
+    }
+  };
 
   const handleWorktreeSelect = (result: BranchSelectionResult) => {
     if (result.type === 'existing') {
@@ -165,7 +215,7 @@ export function App() {
       }));
       setStep({ type: 'operations' });
     } else if (action === 'replace') {
-      await checkEnvFiles();
+      await checkConfigOrEnvFiles();
     }
   };
 
@@ -189,13 +239,26 @@ export function App() {
       }
     }
 
-    await checkEnvFiles();
+    await checkConfigOrEnvFiles();
   };
 
   const handleBaseBranch = async (useOrigin: boolean) => {
     if (useOrigin) {
       const defaultBranch = await getDefaultBranch();
       setCtx((prev) => ({ ...prev, baseBranch: `origin/${defaultBranch}` }));
+    }
+    await checkConfigOrEnvFiles();
+  };
+
+  const checkConfigOrEnvFiles = async () => {
+    const repoConfig = getRepoConfig(ctx.savedConfig, ctx.repoName);
+    if (repoConfig?.defaultValues) {
+      const defaults = repoConfig.defaultValues;
+      const hasAnyValue = Object.values(defaults).some((v) => v !== undefined);
+      if (hasAnyValue) {
+        setStep({ type: 'config-summary', defaults });
+        return;
+      }
     }
     await checkEnvFiles();
   };
@@ -207,6 +270,21 @@ export function App() {
     } else {
       await checkGeneratedFiles();
     }
+  };
+
+  const prepareFilesAndProceed = async () => {
+    const [envFiles, generatedFiles] = await Promise.all([
+      findEnvFiles(ctx.mainRepoPath),
+      findGeneratedFiles(ctx.mainRepoPath),
+    ]);
+
+    setCtx((prev) => ({
+      ...prev,
+      envFiles: prev.envAction !== 'nothing' ? envFiles : [],
+      generatedFiles: prev.shouldCopyGeneratedFiles ? generatedFiles : [],
+    }));
+
+    setStep({ type: 'operations' });
   };
 
   const handleEnvAction = async (action: EnvAction) => {
@@ -251,7 +329,7 @@ export function App() {
 
   const handleOpenTerminal = (value: boolean) => {
     setCtx((prev) => ({ ...prev, shouldOpenTerminal: value }));
-    setStep({ type: 'operations' });
+    setStep({ type: 'save-config' });
   };
 
   const buildOperations = (): Operation[] => {
@@ -410,6 +488,20 @@ export function App() {
     }
   };
 
+  const handleSaveConfig = async (save: boolean) => {
+    if (save) {
+      const defaults: DefaultValues = {
+        dotEnvAction: ctx.envAction,
+        copyGeneratedFiles: ctx.generatedFiles.length > 0,
+        installDependencies: ctx.shouldInstallDeps,
+        openInEditor: ctx.shouldOpenEditor,
+        openInTerminal: ctx.shouldOpenTerminal,
+      };
+      await saveRepoConfig(ctx.repoName, defaults);
+    }
+    setStep({ type: 'operations' });
+  };
+
   const renderHeader = () => (
     <>
       <Text><Text bold>Git Worktree Manager</Text> <Version /></Text>
@@ -457,6 +549,15 @@ export function App() {
   return (
     <Box flexDirection="column">
       {renderHeader()}
+
+      {step.type === 'config-summary' && (
+        <ConfigSummary
+          repoName={ctx.repoName}
+          defaults={step.defaults}
+          onConfirm={handleConfigSummary}
+          onCancel={handleCancel}
+        />
+      )}
 
       {step.type === 'select-worktree' && (
         <BranchSelection onSelect={handleWorktreeSelect} onCancel={handleCancel} />
@@ -565,6 +666,20 @@ export function App() {
         <Operations
           operations={buildOperations()}
           onComplete={handleOperationsComplete}
+        />
+      )}
+
+      {step.type === 'save-config' && (
+        <SaveConfig
+          defaults={{
+            dotEnvAction: ctx.envAction,
+            copyGeneratedFiles: ctx.generatedFiles.length > 0,
+            installDependencies: ctx.shouldInstallDeps,
+            openInEditor: ctx.shouldOpenEditor,
+            openInTerminal: ctx.shouldOpenTerminal,
+          }}
+          onConfirm={handleSaveConfig}
+          onCancel={handleCancel}
         />
       )}
     </Box>

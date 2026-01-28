@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Text, Box } from 'ink';
 import Spinner from 'ink-spinner';
 import { useBranchCheck } from '../hooks/use-branch-check.ts';
@@ -14,11 +14,16 @@ interface BranchCheckProps {
 
 export function BranchCheck({ branchName, onResult, onCancel }: BranchCheckProps) {
   const branchStatus = useBranchCheck(branchName);
+  const hasCalledRef = useRef(false);
 
   useEffect(() => {
+    if (hasCalledRef.current) return;
+
     if (branchStatus.status === 'not-found') {
+      hasCalledRef.current = true;
       onResult('create');
     } else if (branchStatus.status === 'local') {
+      hasCalledRef.current = true;
       onResult('use-existing');
     }
   }, [branchStatus.status, onResult]);

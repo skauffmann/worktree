@@ -4,7 +4,13 @@ const EDITORS = ["cursor", "code", "zed"] as const;
 
 export type EditorName = (typeof EDITORS)[number] | string;
 
-export async function detectEditor(): Promise<EditorName | null> {
+export async function detectEditor(
+  preferredEditor?: string
+): Promise<EditorName | null> {
+  if (preferredEditor && (await isAvailable(preferredEditor))) {
+    return preferredEditor;
+  }
+
   if (process.env.WORKTREE_EDITOR) return process.env.WORKTREE_EDITOR;
 
   for (const editor of EDITORS) {
