@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Text, Box, useInput } from 'ink';
-import TextInput from 'ink-text-input';
+import { Text, Box } from 'ink';
+import { TextInput } from '@inkjs/ui';
 import Spinner from 'ink-spinner';
 import { useWorktrees } from '../hooks/use-worktrees.ts';
 import { useListNavigation } from '../hooks/use-list-navigation.ts';
+import { useBranchSuggestions } from '../hooks/use-branch-suggestions.ts';
 import type { WorktreeInfo } from '../lib/git.ts';
 
 export type BranchSelectionResult =
@@ -17,10 +18,12 @@ interface BranchSelectionProps {
 
 export function BranchSelection({ onSelect, onCancel }: BranchSelectionProps) {
   const worktreesState = useWorktrees();
+  const suggestionsState = useBranchSuggestions();
   const [customValue, setCustomValue] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const worktrees = worktreesState.status === 'loaded' ? worktreesState.worktrees : [];
+  const suggestions = suggestionsState.status === 'loaded' ? suggestionsState.suggestions : [];
   const itemCount = worktrees.length + 1;
 
   const { selectedIndex } = useListNavigation({
@@ -77,14 +80,15 @@ export function BranchSelection({ onSelect, onCancel }: BranchSelectionProps) {
           {isCustomSelected ? '❯ ' : '  '}
         </Text>
         <TextInput
-          value={customValue}
+          defaultValue={customValue}
           onChange={(value) => {
             setCustomValue(value);
             setError(null);
           }}
           onSubmit={handleSubmit}
           placeholder="Enter branch name (or origin/branch)..."
-          focus={isCustomSelected}
+          isDisabled={!isCustomSelected}
+          suggestions={suggestions}
         />
       </Box>
       {error && <Text color="red">    {error}</Text>}
