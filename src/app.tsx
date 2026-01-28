@@ -353,6 +353,7 @@ export function App({ initialBranchName }: AppProps) {
       id: 'saveConfig',
       label: hasSavedConfig ? 'Update config' : 'Save config',
       type: 'boolean',
+      hint: 'The configuration will be saved in the ~/.worktree.json file',
     });
     initialValues.saveConfig = true;
 
