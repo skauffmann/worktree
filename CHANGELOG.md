@@ -1,3 +1,18 @@
+# [1.9.0](https://github.com/skauffmann/worktree/compare/v1.8.0...v1.9.0) (2026-01-28)
+
+
+### Bug Fixes
+
+* improve Ghostty terminal new tab support ([#23](https://github.com/skauffmann/worktree/issues/23)) ([63be776](https://github.com/skauffmann/worktree/commit/63be7762542e5bb289e0966bc9d28ca7f670dde6))
+
+
+### Features
+
+* add autocomplete suggestions for branch name input ([#24](https://github.com/skauffmann/worktree/issues/24)) ([ba5216a](https://github.com/skauffmann/worktree/commit/ba5216a5da3af883662ef8403b73ad82b8964a16))
+* add support for tracking remote branches directly ([#21](https://github.com/skauffmann/worktree/issues/21)) ([4b2e32b](https://github.com/skauffmann/worktree/commit/4b2e32bdcab15f45e89a6894096b725e8c0a5b3b))
+* migrate CLI from clack to Ink (React) ([#19](https://github.com/skauffmann/worktree/issues/19)) ([87fc5c1](https://github.com/skauffmann/worktree/commit/87fc5c1eb9d7f0a6dfc9abda52d4142ef214525e))
+* move remote branch tracking question to batch config ([#22](https://github.com/skauffmann/worktree/issues/22)) ([b1a552e](https://github.com/skauffmann/worktree/commit/b1a552ecb10e4dc8624af1677cf0094e551287d8))
+
 # [1.8.0](https://github.com/skauffmann/worktree/compare/v1.7.1...v1.8.0) (2026-01-23)
 
 
