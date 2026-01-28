@@ -253,7 +253,8 @@ async function isGitignored(filePath: string): Promise<boolean> {
   const isTracked = await isFileTrackedByGit(filePath);
   if (isTracked) return false;
 
-  const result = await $`git check-ignore --quiet ${filePath}`.nothrow().quiet();
+  const dir = dirname(filePath);
+  const result = await $`cd ${dir} && git check-ignore --quiet ${filePath}`.nothrow().quiet();
   return result.exitCode === 0;
 }
 
