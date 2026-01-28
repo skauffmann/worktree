@@ -203,6 +203,23 @@ export async function isOriginAhead(branch: string): Promise<{ exists: boolean; 
   return { exists: true, ahead };
 }
 
+export async function getBranchStatus(branch: string): Promise<{ ahead: number; behind: number } | null> {
+  const remoteRef = `origin/${branch}`;
+
+  const refExists = await $`git show-ref --verify --quiet refs/remotes/${remoteRef}`.nothrow().quiet();
+  if (refExists.exitCode !== 0) {
+    return null;
+  }
+
+  const result = await $`git rev-list --left-right --count ${branch}...${remoteRef}`.nothrow().quiet();
+  if (result.exitCode !== 0) {
+    return null;
+  }
+
+  const [ahead, behind] = result.stdout.toString().trim().split(/\s+/).map(Number);
+  return { ahead: ahead || 0, behind: behind || 0 };
+}
+
 export async function gitFetch(): Promise<{ success: boolean; error?: string }> {
   const result = await $`git fetch origin`.nothrow().quiet();
 

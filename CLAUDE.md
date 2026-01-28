@@ -24,26 +24,27 @@ bun test src/lib/git.test.ts
 
 ```
 src/
-├── index.ts          # Entry point
-├── command.ts        # Main command orchestration
-├── lib/              # Core utilities (git, files, editor, prompts)
-├── operations/       # Side-effect operations (create/remove worktree, install deps)
-└── prompts/          # User interaction (prompt-*.ts files)
+├── index.tsx         # Entry point
+├── app.tsx           # Main wizard with state machine
+├── hooks/            # React hooks for reusable logic
+├── ui/               # React UI components (Ink-based)
+└── lib/              # Core utilities (git, files, editor, terminal)
 ```
 
-**Data flow**: Entry → Detection (git/worktree status) → Prompts → Operations → Lib utilities
+**Data flow**: Entry → App (state machine) → UI Components → Hooks → Lib utilities
 
 **Separation of concerns**:
 - `lib/` contains pure utilities and low-level operations
-- `operations/` contains high-level workflows with side effects
-- `prompts/` handles all user interaction via @clack/prompts
+- `hooks/` contains reusable logic (useWorktrees, useConfirm, etc.)
+- `ui/` contains React components for terminal UI (Ink)
 
 ## Conventions
 
 - Bun runtime with ES modules
 - TypeScript strict mode enabled
-- Kebab-case file naming: `create-worktree-operation.ts`
-- Operations end with `-operation.ts`, prompts start with `prompt-`
+- Kebab-case file naming: `use-worktrees.ts`, `branch-selection.tsx`
+- Hooks start with `use-`, UI components are `.tsx` files
 - Tests use `*.test.ts` suffix with Bun's test runner (`describe/test/expect`)
 - Async/await for I/O, result objects with `{ success, error }` pattern for error handling
+- React/Ink for terminal UI with hooks for logic separation
 - No unnecessary comments: code should be self-explanatory
