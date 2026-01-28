@@ -2,16 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useApp } from 'ink';
 import Spinner from 'ink-spinner';
 import { join } from 'node:path';
-import { existsSync } from 'node:fs';
-import { BranchSelection, type BranchSelectionResult } from './ui/branch-selection.tsx';
-import { WorktreeActions, type WorktreeAction } from './ui/worktree-actions.tsx';
+import {
+  BranchSelection,
+  type BranchSelectionResult,
+} from './ui/branch-selection.tsx';
+import {
+  WorktreeActions,
+  type WorktreeAction,
+} from './ui/worktree-actions.tsx';
 import { BranchCheck, type BranchAction } from './ui/branch-check.tsx';
-import { Confirm } from './ui/confirm.tsx';
-import { Select } from './ui/select.tsx';
 import { Operations, type Operation } from './ui/operations.tsx';
 import { Version } from './ui/version.tsx';
-import { ConfigSummary } from './ui/config-summary.tsx';
-import { SaveConfig } from './ui/save-config.tsx';
+import {
+  BatchQuestions,
+  type Question,
+  type Answers,
+} from './ui/batch-questions.tsx';
 import {
   isInsideGitRepo,
   getRepoName,
@@ -46,21 +52,23 @@ import { $ } from 'bun';
 
 type EnvAction = 'symlink' | 'copy' | 'nothing';
 
+interface BatchConfigData {
+  questions: Question[];
+  initialValues: Answers;
+  envFiles: string[];
+  generatedFiles: string[];
+  projectCount: number;
+  showBaseBranch: boolean;
+}
+
 type Step =
   | { type: 'loading' }
   | { type: 'not-git-repo' }
-  | { type: 'config-summary'; defaults: DefaultValues }
   | { type: 'select-worktree' }
   | { type: 'worktree-actions'; worktree: WorktreeInfo }
   | { type: 'branch-check'; branchName: string }
-  | { type: 'base-branch' }
-  | { type: 'env-files'; files: string[] }
-  | { type: 'generated-files'; files: string[] }
-  | { type: 'install-deps'; projectCount: number }
-  | { type: 'open-editor' }
-  | { type: 'open-terminal' }
+  | { type: 'batch-config'; data: BatchConfigData }
   | { type: 'operations' }
-  | { type: 'save-config' }
   | { type: 'done'; message: string }
   | { type: 'cancelled' };
 
@@ -142,31 +150,17 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (step.type === 'not-git-repo' || step.type === 'cancelled' || step.type === 'done') {
+    if (
+      step.type === 'not-git-repo' ||
+      step.type === 'cancelled' ||
+      step.type === 'done'
+    ) {
       const timer = setTimeout(() => exit(), 100);
       return () => clearTimeout(timer);
     }
   }, [step.type, exit]);
 
   const handleCancel = () => setStep({ type: 'cancelled' });
-
-  const handleConfigSummary = async (useDefaults: boolean) => {
-    if (useDefaults && step.type === 'config-summary') {
-      const defaults = step.defaults;
-      setCtx((prev) => ({
-        ...prev,
-        usingDefaults: true,
-        envAction: defaults.dotEnvAction || prev.envAction,
-        shouldCopyGeneratedFiles: defaults.copyGeneratedFiles ?? false,
-        shouldInstallDeps: defaults.installDependencies ?? prev.shouldInstallDeps,
-        shouldOpenEditor: defaults.openInEditor ?? prev.shouldOpenEditor,
-        shouldOpenTerminal: defaults.openInTerminal ?? prev.shouldOpenTerminal,
-      }));
-      await prepareFilesAndProceed();
-    } else {
-      await checkEnvFiles();
-    }
-  };
 
   const handleWorktreeSelect = (result: BranchSelectionResult) => {
     if (result.type === 'existing') {
@@ -215,7 +209,7 @@ export function App() {
       }));
       setStep({ type: 'operations' });
     } else if (action === 'replace') {
-      await checkConfigOrEnvFiles();
+      await buildBatchQuestions();
     }
   };
 
@@ -228,108 +222,174 @@ export function App() {
       setCtx((prev) => ({ ...prev, createNewBranch: true }));
     }
 
-    const currentBranch = await getCurrentBranch();
-    const defaultBranch = await getDefaultBranch();
-
-    if (currentBranch && defaultBranch && currentBranch === defaultBranch) {
-      const originStatus = await isOriginAhead(defaultBranch);
-      if (originStatus.exists) {
-        setStep({ type: 'base-branch' });
-        return;
-      }
-    }
-
-    await checkConfigOrEnvFiles();
+    await buildBatchQuestions();
   };
 
-  const handleBaseBranch = async (useOrigin: boolean) => {
-    if (useOrigin) {
+  const buildBatchQuestions = async () => {
+    const [
+      envFiles,
+      generatedFiles,
+      structure,
+      currentBranch,
+      defaultBranch,
+      packageManager,
+      editor,
+      terminal,
+    ] = await Promise.all([
+      findEnvFiles(ctx.mainRepoPath),
+      findGeneratedFiles(ctx.mainRepoPath),
+      detectRepoStructure(ctx.mainRepoPath),
+      getCurrentBranch(),
+      getDefaultBranch(),
+      detectPackageManager(ctx.mainRepoPath),
+      detectEditor(),
+      detectTerminal(),
+    ]);
+
+    let showBaseBranch = false;
+    if (currentBranch && defaultBranch && currentBranch === defaultBranch) {
+      const originStatus = await isOriginAhead(defaultBranch);
+      showBaseBranch = originStatus.exists;
+    }
+
+    const repoConfig = getRepoConfig(ctx.savedConfig, ctx.repoName);
+    const savedDefaults = repoConfig?.defaultValues;
+    const hasSavedConfig =
+      savedDefaults &&
+      Object.values(savedDefaults).some((v) => v !== undefined);
+
+    const questions: Question[] = [];
+    const initialValues: Answers = {};
+
+    if (showBaseBranch) {
+      questions.push({
+        id: 'useOriginMain',
+        label: `From origin/${defaultBranch}`,
+        type: 'boolean',
+      });
+      initialValues.useOriginMain = true;
+    }
+
+    if (envFiles.length > 0) {
+      questions.push({
+        id: 'envAction',
+        label: 'Env files',
+        type: 'select',
+        options: [
+          { value: 'symlink', label: 'Symlink' },
+          { value: 'copy', label: 'Copy' },
+          { value: 'nothing', label: 'Nothing' },
+        ],
+        hint: `files: ${envFiles.join(', ')}`,
+      });
+      initialValues.envAction = savedDefaults?.dotEnvAction || 'symlink';
+    }
+
+    if (generatedFiles.length > 0) {
+      questions.push({
+        id: 'copyGenerated',
+        label: 'Generated files',
+        type: 'select',
+        options: [
+          { value: 'copy', label: 'Copy' },
+          { value: 'nothing', label: 'Nothing' },
+        ],
+        hint: `files: ${generatedFiles.join(', ')}`,
+      });
+      initialValues.copyGenerated = savedDefaults?.copyGeneratedFiles
+        ? 'copy'
+        : 'copy';
+    }
+
+    if (structure.projects.length > 0) {
+      questions.push({
+        id: 'installDeps',
+        label: `Install deps (${packageManager})`,
+        type: 'boolean',
+        hint:
+          'projects: ' +
+          structure.projects.map((p) => p.relativePath).join(', '),
+      });
+      initialValues.installDeps = savedDefaults?.installDependencies ?? true;
+    }
+
+    questions.push({
+      id: 'openEditor',
+      label: editor ? `Open in editor (${editor})` : 'Open in editor',
+      type: 'boolean',
+      hint: 'update your favorite editor in the ~/.worktree.json file',
+    });
+    initialValues.openEditor = savedDefaults?.openInEditor ?? true;
+
+    const terminalName = terminal.name !== 'unknown' ? terminal.name : null;
+    questions.push({
+      id: 'openTerminal',
+      label: terminalName
+        ? `Open in terminal (${terminalName})`
+        : 'Open in terminal',
+      type: 'boolean',
+      hint: 'update your favorite terminal in the ~/.worktree.json file',
+    });
+    initialValues.openTerminal = savedDefaults?.openInTerminal ?? true;
+
+    questions.push({
+      id: 'saveConfig',
+      label: hasSavedConfig ? 'Update config' : 'Save config',
+      type: 'boolean',
+    });
+    initialValues.saveConfig = true;
+
+    const batchData: BatchConfigData = {
+      questions,
+      initialValues,
+      envFiles,
+      generatedFiles,
+      projectCount: structure.projects.length,
+      showBaseBranch,
+    };
+
+    setStep({ type: 'batch-config', data: batchData });
+  };
+
+  const handleBatchConfig = async (answers: Answers) => {
+    const batchData = step.type === 'batch-config' ? step.data : null;
+    if (!batchData) return;
+
+    if (answers.useOriginMain) {
       const defaultBranch = await getDefaultBranch();
       setCtx((prev) => ({ ...prev, baseBranch: `origin/${defaultBranch}` }));
     }
-    await checkConfigOrEnvFiles();
-  };
 
-  const checkConfigOrEnvFiles = async () => {
-    const repoConfig = getRepoConfig(ctx.savedConfig, ctx.repoName);
-    if (repoConfig?.defaultValues) {
-      const defaults = repoConfig.defaultValues;
-      const hasAnyValue = Object.values(defaults).some((v) => v !== undefined);
-      if (hasAnyValue) {
-        setStep({ type: 'config-summary', defaults });
-        return;
-      }
-    }
-    await checkEnvFiles();
-  };
-
-  const checkEnvFiles = async () => {
-    const files = await findEnvFiles(ctx.mainRepoPath);
-    if (files.length > 0) {
-      setStep({ type: 'env-files', files });
-    } else {
-      await checkGeneratedFiles();
-    }
-  };
-
-  const prepareFilesAndProceed = async () => {
-    const [envFiles, generatedFiles] = await Promise.all([
-      findEnvFiles(ctx.mainRepoPath),
-      findGeneratedFiles(ctx.mainRepoPath),
-    ]);
+    const envAction = (answers.envAction as EnvAction) || 'nothing';
+    const copyGenerated = answers.copyGenerated === 'copy';
+    const installDeps = (answers.installDeps as boolean) ?? false;
+    const openEditor = answers.openEditor as boolean;
+    const openTerminal = answers.openTerminal as boolean;
+    const saveConfig = answers.saveConfig as boolean;
 
     setCtx((prev) => ({
       ...prev,
-      envFiles: prev.envAction !== 'nothing' ? envFiles : [],
-      generatedFiles: prev.shouldCopyGeneratedFiles ? generatedFiles : [],
+      envAction,
+      envFiles: envAction !== 'nothing' ? batchData.envFiles : [],
+      shouldCopyGeneratedFiles: copyGenerated,
+      generatedFiles: copyGenerated ? batchData.generatedFiles : [],
+      shouldInstallDeps: installDeps,
+      shouldOpenEditor: openEditor,
+      shouldOpenTerminal: openTerminal,
     }));
 
+    if (saveConfig) {
+      const defaults: DefaultValues = {
+        dotEnvAction: envAction,
+        copyGeneratedFiles: copyGenerated,
+        installDependencies: installDeps,
+        openInEditor: openEditor,
+        openInTerminal: openTerminal,
+      };
+      await saveRepoConfig(ctx.repoName, defaults);
+    }
+
     setStep({ type: 'operations' });
-  };
-
-  const handleEnvAction = async (action: EnvAction) => {
-    const files = step.type === 'env-files' ? step.files : [];
-    setCtx((prev) => ({ ...prev, envFiles: files, envAction: action }));
-    await checkGeneratedFiles();
-  };
-
-  const checkGeneratedFiles = async () => {
-    const files = await findGeneratedFiles(ctx.mainRepoPath);
-    if (files.length > 0) {
-      setStep({ type: 'generated-files', files });
-    } else {
-      await checkInstallDeps();
-    }
-  };
-
-  const handleGeneratedFiles = async (copy: boolean) => {
-    const files = step.type === 'generated-files' && copy ? step.files : [];
-    setCtx((prev) => ({ ...prev, generatedFiles: files }));
-    await checkInstallDeps();
-  };
-
-  const checkInstallDeps = async () => {
-    const structure = await detectRepoStructure(ctx.mainRepoPath);
-    if (structure.projects.length > 0) {
-      setStep({ type: 'install-deps', projectCount: structure.projects.length });
-    } else {
-      setStep({ type: 'open-editor' });
-    }
-  };
-
-  const handleInstallDeps = (value: boolean) => {
-    setCtx((prev) => ({ ...prev, shouldInstallDeps: value }));
-    setStep({ type: 'open-editor' });
-  };
-
-  const handleOpenEditor = (value: boolean) => {
-    setCtx((prev) => ({ ...prev, shouldOpenEditor: value }));
-    setStep({ type: 'open-terminal' });
-  };
-
-  const handleOpenTerminal = (value: boolean) => {
-    setCtx((prev) => ({ ...prev, shouldOpenTerminal: value }));
-    setStep({ type: 'save-config' });
   };
 
   const buildOperations = (): Operation[] => {
@@ -342,7 +402,10 @@ export function App() {
         label: 'Removing worktree',
         run: async () => {
           const result = await removeWorktree(worktreePath);
-          return { success: result.success, message: result.error || 'Worktree removed' };
+          return {
+            success: result.success,
+            message: result.error || 'Worktree removed',
+          };
         },
       });
       return ops;
@@ -381,7 +444,10 @@ export function App() {
         label: 'Fetching from origin',
         run: async () => {
           const result = await gitFetch();
-          return { success: true, message: result.success ? 'Done' : 'Skipped' };
+          return {
+            success: true,
+            message: result.success ? 'Done' : 'Skipped',
+          };
         },
       });
     }
@@ -397,7 +463,10 @@ export function App() {
             ctx.createNewBranch,
             ctx.baseBranch || undefined
           );
-          return { success: result.success, message: result.error || 'Created' };
+          return {
+            success: result.success,
+            message: result.error || 'Created',
+          };
         },
       });
     }
@@ -409,7 +478,11 @@ export function App() {
         run: async () => {
           try {
             if (ctx.envAction === 'symlink') {
-              await symlinkEnvFiles(ctx.mainRepoPath, worktreePath, ctx.envFiles);
+              await symlinkEnvFiles(
+                ctx.mainRepoPath,
+                worktreePath,
+                ctx.envFiles
+              );
             } else {
               await copyEnvFiles(ctx.mainRepoPath, worktreePath, ctx.envFiles);
             }
@@ -427,7 +500,11 @@ export function App() {
         label: 'Copying generated files',
         run: async () => {
           try {
-            await copyGeneratedFiles(ctx.mainRepoPath, worktreePath, ctx.generatedFiles);
+            await copyGeneratedFiles(
+              ctx.mainRepoPath,
+              worktreePath,
+              ctx.generatedFiles
+            );
             return { success: true, message: 'Done' };
           } catch (err) {
             return { success: false, message: String(err) };
@@ -442,7 +519,9 @@ export function App() {
         label: 'Installing dependencies',
         run: async () => {
           const pm = await detectPackageManager(ctx.mainRepoPath);
-          const result = await $`cd ${worktreePath} && ${pm} install`.nothrow().quiet();
+          const result = await $`cd ${worktreePath} && ${pm} install`
+            .nothrow()
+            .quiet();
           return {
             success: result.exitCode === 0,
             message: result.exitCode === 0 ? `Installed with ${pm}` : 'Failed',
@@ -471,7 +550,10 @@ export function App() {
         id: 'terminal',
         label: 'Opening terminal',
         run: async () => {
-          const success = await openInTerminal(worktreePath, `${ctx.repoName}: ${ctx.branchName}`);
+          const success = await openInTerminal(
+            worktreePath,
+            `${ctx.repoName}: ${ctx.branchName}`
+          );
           return { success, message: success ? 'Opened' : 'Failed' };
         },
       });
@@ -484,27 +566,18 @@ export function App() {
     if (ctx.actionOnExisting === 'delete') {
       setStep({ type: 'done', message: 'Worktree deleted.' });
     } else {
-      setStep({ type: 'done', message: `Worktree ready at: ${ctx.worktreePath}` });
+      setStep({
+        type: 'done',
+        message: `Worktree ready at: ${ctx.worktreePath}`,
+      });
     }
-  };
-
-  const handleSaveConfig = async (save: boolean) => {
-    if (save) {
-      const defaults: DefaultValues = {
-        dotEnvAction: ctx.envAction,
-        copyGeneratedFiles: ctx.generatedFiles.length > 0,
-        installDependencies: ctx.shouldInstallDeps,
-        openInEditor: ctx.shouldOpenEditor,
-        openInTerminal: ctx.shouldOpenTerminal,
-      };
-      await saveRepoConfig(ctx.repoName, defaults);
-    }
-    setStep({ type: 'operations' });
   };
 
   const renderHeader = () => (
     <>
-      <Text><Text bold>Git Worktree Manager</Text> <Version /></Text>
+      <Text>
+        <Text bold>Git Worktree Manager</Text> <Version />
+      </Text>
       {ctx.repoName && <Text dimColor>Repository: {ctx.repoName}</Text>}
       <Text> </Text>
     </>
@@ -514,7 +587,12 @@ export function App() {
     return (
       <Box flexDirection="column">
         {renderHeader()}
-        <Text><Text color="cyan"><Spinner type="dots" /></Text> Initializing...</Text>
+        <Text>
+          <Text color="cyan">
+            <Spinner type="dots" />
+          </Text>{' '}
+          Initializing...
+        </Text>
       </Box>
     );
   }
@@ -550,17 +628,11 @@ export function App() {
     <Box flexDirection="column">
       {renderHeader()}
 
-      {step.type === 'config-summary' && (
-        <ConfigSummary
-          repoName={ctx.repoName}
-          defaults={step.defaults}
-          onConfirm={handleConfigSummary}
+      {step.type === 'select-worktree' && (
+        <BranchSelection
+          onSelect={handleWorktreeSelect}
           onCancel={handleCancel}
         />
-      )}
-
-      {step.type === 'select-worktree' && (
-        <BranchSelection onSelect={handleWorktreeSelect} onCancel={handleCancel} />
       )}
 
       {step.type === 'worktree-actions' && (
@@ -579,85 +651,12 @@ export function App() {
         />
       )}
 
-      {step.type === 'base-branch' && (
-        <Confirm
-          message="Create from origin/main?"
-          defaultValue={true}
-          onConfirm={handleBaseBranch}
-          onCancel={handleCancel}
-        />
-      )}
-
-      {step.type === 'env-files' && (
-        <Box flexDirection="column">
-          <Box
-            flexDirection="column"
-            borderStyle="round"
-            borderColor="gray"
-            paddingX={1}
-            marginBottom={1}
-          >
-            <Text bold color="cyan">Environment Files</Text>
-            <Text>Found {step.files.length} env file(s): {step.files.join(', ')}</Text>
-          </Box>
-          <Select<EnvAction>
-            message="How to handle .env files?"
-            options={[
-              { value: 'symlink', label: 'Symlink', hint: 'recommended - stays in sync' },
-              { value: 'copy', label: 'Copy', hint: 'independent copies' },
-              { value: 'nothing', label: 'Nothing', hint: 'skip env files' },
-            ]}
-            defaultValue="symlink"
-            onSelect={handleEnvAction}
-            onCancel={handleCancel}
-          />
-        </Box>
-      )}
-
-      {step.type === 'generated-files' && (
-        <Box flexDirection="column">
-          <Box
-            flexDirection="column"
-            borderStyle="round"
-            borderColor="gray"
-            paddingX={1}
-            marginBottom={1}
-          >
-            <Text bold color="cyan">Generated Files</Text>
-            <Text>Found {step.files.length} file(s): {step.files.join(', ')}</Text>
-          </Box>
-          <Confirm
-            message="Copy generated files to new worktree?"
-            defaultValue={true}
-            onConfirm={handleGeneratedFiles}
-            onCancel={handleCancel}
-          />
-        </Box>
-      )}
-
-      {step.type === 'install-deps' && (
-        <Confirm
-          message={`Install dependencies? (${step.projectCount} project(s))`}
-          defaultValue={true}
-          onConfirm={handleInstallDeps}
-          onCancel={handleCancel}
-        />
-      )}
-
-      {step.type === 'open-editor' && (
-        <Confirm
-          message="Open in editor after processing?"
-          defaultValue={true}
-          onConfirm={handleOpenEditor}
-          onCancel={handleCancel}
-        />
-      )}
-
-      {step.type === 'open-terminal' && (
-        <Confirm
-          message="Open in a new terminal tab?"
-          defaultValue={true}
-          onConfirm={handleOpenTerminal}
+      {step.type === 'batch-config' && (
+        <BatchQuestions
+          title={`Configuration for ${ctx.branchName}`}
+          questions={step.data.questions}
+          initialValues={step.data.initialValues}
+          onConfirm={handleBatchConfig}
           onCancel={handleCancel}
         />
       )}
@@ -666,20 +665,6 @@ export function App() {
         <Operations
           operations={buildOperations()}
           onComplete={handleOperationsComplete}
-        />
-      )}
-
-      {step.type === 'save-config' && (
-        <SaveConfig
-          defaults={{
-            dotEnvAction: ctx.envAction,
-            copyGeneratedFiles: ctx.generatedFiles.length > 0,
-            installDependencies: ctx.shouldInstallDeps,
-            openInEditor: ctx.shouldOpenEditor,
-            openInTerminal: ctx.shouldOpenTerminal,
-          }}
-          onConfirm={handleSaveConfig}
-          onCancel={handleCancel}
         />
       )}
     </Box>
