@@ -80,6 +80,7 @@ interface Context {
   worktreePath: string | null;
   createNewBranch: boolean;
   baseBranch: string | null;
+  branchExistsOnRemote: boolean;
   envFiles: string[];
   envAction: EnvAction;
   generatedFiles: string[];
@@ -101,6 +102,7 @@ function createInitialContext(): Context {
     worktreePath: null,
     createNewBranch: true,
     baseBranch: null,
+    branchExistsOnRemote: false,
     envFiles: [],
     envAction: 'nothing',
     generatedFiles: [],
@@ -256,6 +258,14 @@ export function App({ initialBranchName }: AppProps) {
           baseBranch: `origin/${prev.branchName}`,
         }));
       }
+    } else if (action === 'remote-exists') {
+      setCtx((prev) => ({
+        ...prev,
+        branchExistsOnRemote: true,
+        createNewBranch: true,
+      }));
+      await buildBatchQuestions({ branchExistsOnRemote: true });
+      return;
     } else {
       setCtx((prev) => ({ ...prev, createNewBranch: true }));
     }
@@ -263,7 +273,7 @@ export function App({ initialBranchName }: AppProps) {
     await buildBatchQuestions();
   };
 
-  const buildBatchQuestions = async () => {
+  const buildBatchQuestions = async (options?: { branchExistsOnRemote?: boolean }) => {
     const [
       envFiles,
       generatedFiles,
@@ -298,6 +308,15 @@ export function App({ initialBranchName }: AppProps) {
 
     const questions: Question[] = [];
     const initialValues: Answers = {};
+
+    if (options?.branchExistsOnRemote) {
+      questions.push({
+        id: 'trackRemote',
+        label: `Track remote branch "${ctx.branchName}"`,
+        type: 'boolean',
+      });
+      initialValues.trackRemote = true;
+    }
 
     if (showBaseBranch) {
       questions.push({
@@ -393,6 +412,13 @@ export function App({ initialBranchName }: AppProps) {
   const handleBatchConfig = async (answers: Answers) => {
     const batchData = step.type === 'batch-config' ? step.data : null;
     if (!batchData) return;
+
+    if (answers.trackRemote && ctx.branchExistsOnRemote) {
+      setCtx((prev) => ({
+        ...prev,
+        baseBranch: `origin/${prev.branchName}`,
+      }));
+    }
 
     if (answers.useOriginMain) {
       const defaultBranch = await getDefaultBranch();
