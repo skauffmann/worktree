@@ -2,10 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import { Text, Box } from 'ink';
 import Spinner from 'ink-spinner';
 import { useBranchCheck } from '../hooks/use-branch-check.ts';
-import { useConfirm } from '../hooks/use-confirm.ts';
 import type { RemoteBranchRef } from '../lib/git.ts';
 
-export type BranchAction = 'create' | 'track' | 'use-existing';
+export type BranchAction = 'create' | 'track' | 'use-existing' | 'remote-exists';
 
 export interface BranchCheckResult {
   action: BranchAction;
@@ -34,6 +33,9 @@ export function BranchCheck({ branchName, onResult, onCancel }: BranchCheckProps
     } else if (branchStatus.status === 'remote-ref') {
       hasCalledRef.current = true;
       onResult({ action: 'track', remoteRef: branchStatus.remoteRef });
+    } else if (branchStatus.status === 'remote') {
+      hasCalledRef.current = true;
+      onResult({ action: 'remote-exists' });
     }
   }, [branchStatus, onResult]);
 
@@ -61,16 +63,6 @@ export function BranchCheck({ branchName, onResult, onCancel }: BranchCheckProps
     );
   }
 
-  if (branchStatus.status === 'remote') {
-    return (
-      <RemoteConfirm
-        branchName={branchName}
-        onResult={(action) => onResult({ action })}
-        onCancel={onCancel}
-      />
-    );
-  }
-
   if (branchStatus.status === 'remote-ref') {
     return (
       <Text>
@@ -80,36 +72,4 @@ export function BranchCheck({ branchName, onResult, onCancel }: BranchCheckProps
   }
 
   return null;
-}
-
-interface RemoteConfirmProps {
-  branchName: string;
-  onResult: (action: BranchAction) => void;
-  onCancel?: () => void;
-}
-
-function RemoteConfirm({ branchName, onResult, onCancel }: RemoteConfirmProps) {
-  const { value } = useConfirm({
-    defaultValue: true,
-    onConfirm: (confirmed) => onResult(confirmed ? 'track' : 'create'),
-    onCancel,
-  });
-
-  return (
-    <Box>
-      <Text color="cyan">? </Text>
-      <Text bold>Branch "{branchName}" exists on remote. Track it? </Text>
-      <Text dimColor>
-        {value ? (
-          <>
-            <Text color="green" underline>Yes</Text> / No
-          </>
-        ) : (
-          <>
-            Yes / <Text color="red" underline>No</Text>
-          </>
-        )}
-      </Text>
-    </Box>
-  );
 }
