@@ -24,7 +24,7 @@ export function detectTerminal(): TerminalInfo {
   const termProgram = process.env.TERM_PROGRAM?.toLowerCase() || "";
 
   if (process.env.GHOSTTY_RESOURCES_DIR) {
-    return { name: "ghostty", supportsNewTab: true, supportsTitle: true };
+    return { name: "ghostty", supportsNewTab: true, supportsTitle: false };
   }
 
   if (process.env.ITERM_SESSION_ID) {
@@ -147,19 +147,17 @@ async function openInWarp(path: string): Promise<boolean> {
   return result.exitCode === 0;
 }
 
-async function openInGhostty(path: string, title?: string): Promise<boolean> {
-  const titleCommand = title ? ` && printf '\\033]0;${escapeShell(title)}\\007'` : "";
+async function openInGhostty(path: string, _title?: string): Promise<boolean> {
   const script = `
-    tell application "Ghostty"
-      activate
-      tell application "System Events"
-        keystroke "t" using command down
-        delay 0.3
-        keystroke "cd ${escapePath(path)}${titleCommand}"
-        key code 36
-      end tell
-    end tell
-  `;
+tell application "System Events"
+  tell process "Ghostty"
+    keystroke "t" using command down
+    delay 0.5
+    keystroke "cd ${escapePath(path)}"
+    keystroke return
+  end tell
+end tell
+`;
   const result = await $`osascript -e ${script}`.nothrow().quiet();
   return result.exitCode === 0;
 }
