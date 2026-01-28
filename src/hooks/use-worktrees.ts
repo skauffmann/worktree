@@ -4,6 +4,7 @@ import { listWorktrees, getBranchStatus, type WorktreeInfo } from '../lib/git.ts
 export interface WorktreeWithStatus extends WorktreeInfo {
   ahead: number;
   behind: number;
+  hasRemote: boolean;
 }
 
 type State =
@@ -25,13 +26,14 @@ export function useWorktrees() {
         const withStatus = await Promise.all(
           filtered.map(async (wt) => {
             if (!wt.branch) {
-              return { ...wt, ahead: 0, behind: 0 };
+              return { ...wt, ahead: 0, behind: 0, hasRemote: false };
             }
             const status = await getBranchStatus(wt.branch);
             return {
               ...wt,
               ahead: status?.ahead || 0,
               behind: status?.behind || 0,
+              hasRemote: status !== null,
             };
           })
         );

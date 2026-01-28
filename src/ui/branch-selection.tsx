@@ -98,14 +98,19 @@ export function BranchSelection({ onSelect, onCancel }: BranchSelectionProps) {
             const statusParts: string[] = [];
             if (wt.ahead > 0) statusParts.push(`↑${wt.ahead}`);
             if (wt.behind > 0) statusParts.push(`↓${wt.behind}`);
-            const statusText = statusParts.length > 0 ? ` [${statusParts.join(' ')}]` : '';
+            const syncStatus = statusParts.length > 0 ? ` [${statusParts.join(' ')}]` : '';
             return (
               <Box key={wt.path} marginLeft={2}>
                 <Text color={isSelected ? 'cyan' : undefined}>
                   {isSelected ? '❯ ' : '  '}
                   {label}
                 </Text>
-                {statusText && <Text color="yellow">{statusText}</Text>}
+                {wt.hasRemote ? (
+                  <Text color="green"> ✓</Text>
+                ) : (
+                  <Text color="gray"> (local)</Text>
+                )}
+                {syncStatus && <Text color="yellow">{syncStatus}</Text>}
               </Box>
             );
           })}
