@@ -114,7 +114,11 @@ function createInitialContext(): Context {
   };
 }
 
-export function App() {
+interface AppProps {
+  initialBranchName?: string | null;
+}
+
+export function App({ initialBranchName }: AppProps) {
   const { exit } = useApp();
   const [step, setStep] = useState<Step>({ type: 'loading' });
   const [ctx, setCtx] = useState<Context>(createInitialContext);
@@ -133,7 +137,6 @@ export function App() {
       ]);
 
       const savedConfig = configResult.success ? configResult.config : null;
-      const repoConfig = getRepoConfig(savedConfig, repoName);
       const preferredTerminal = savedConfig?.terminal || null;
 
       setCtx((prev) => ({
@@ -144,10 +147,24 @@ export function App() {
         preferredTerminal,
       }));
 
-      setStep({ type: 'select-worktree' });
+      if (initialBranchName) {
+        const worktreePath = join(
+          mainRepoPath,
+          '..',
+          `${repoName}-${initialBranchName.replace(/\//g, '-')}`
+        );
+        setCtx((prev) => ({
+          ...prev,
+          branchName: initialBranchName,
+          worktreePath,
+        }));
+        setStep({ type: 'branch-check', branchName: initialBranchName });
+      } else {
+        setStep({ type: 'select-worktree' });
+      }
     }
     init();
-  }, []);
+  }, [initialBranchName]);
 
   useEffect(() => {
     if (
