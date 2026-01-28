@@ -14,7 +14,56 @@ import {
   listWorktrees,
   branchExists,
   gitFetch,
+  parseRemoteBranch,
 } from "./git";
+
+describe("parseRemoteBranch", () => {
+  test("should parse origin/branch format", () => {
+    const result = parseRemoteBranch("origin/feature-branch");
+    expect(result).toEqual({
+      remote: "origin",
+      branch: "feature-branch",
+      fullRef: "origin/feature-branch",
+    });
+  });
+
+  test("should parse origin/nested/branch format", () => {
+    const result = parseRemoteBranch("origin/feature/nested/branch");
+    expect(result).toEqual({
+      remote: "origin",
+      branch: "feature/nested/branch",
+      fullRef: "origin/feature/nested/branch",
+    });
+  });
+
+  test("should parse remotes/origin/branch format", () => {
+    const result = parseRemoteBranch("remotes/origin/feature-branch");
+    expect(result).toEqual({
+      remote: "origin",
+      branch: "feature-branch",
+      fullRef: "remotes/origin/feature-branch",
+    });
+  });
+
+  test("should parse remotes/upstream/branch format", () => {
+    const result = parseRemoteBranch("remotes/upstream/main");
+    expect(result).toEqual({
+      remote: "upstream",
+      branch: "main",
+      fullRef: "remotes/upstream/main",
+    });
+  });
+
+  test("should return null for local branch names", () => {
+    expect(parseRemoteBranch("feature-branch")).toBeNull();
+    expect(parseRemoteBranch("main")).toBeNull();
+    expect(parseRemoteBranch("feature/nested")).toBeNull();
+  });
+
+  test("should return null for non-origin remote without remotes/ prefix", () => {
+    expect(parseRemoteBranch("upstream/main")).toBeNull();
+  });
+});
 
 describe("git", () => {
   let testDir: string;

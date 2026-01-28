@@ -83,7 +83,7 @@ export function BranchSelection({ onSelect, onCancel }: BranchSelectionProps) {
             setError(null);
           }}
           onSubmit={handleSubmit}
-          placeholder="Enter new branch name..."
+          placeholder="Enter branch name (or origin/branch)..."
           focus={isCustomSelected}
         />
       </Box>

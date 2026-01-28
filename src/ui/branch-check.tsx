@@ -3,12 +3,18 @@ import { Text, Box } from 'ink';
 import Spinner from 'ink-spinner';
 import { useBranchCheck } from '../hooks/use-branch-check.ts';
 import { useConfirm } from '../hooks/use-confirm.ts';
+import type { RemoteBranchRef } from '../lib/git.ts';
 
 export type BranchAction = 'create' | 'track' | 'use-existing';
 
+export interface BranchCheckResult {
+  action: BranchAction;
+  remoteRef?: RemoteBranchRef;
+}
+
 interface BranchCheckProps {
   branchName: string;
-  onResult: (action: BranchAction) => void;
+  onResult: (result: BranchCheckResult) => void;
   onCancel?: () => void;
 }
 
@@ -21,12 +27,15 @@ export function BranchCheck({ branchName, onResult, onCancel }: BranchCheckProps
 
     if (branchStatus.status === 'not-found') {
       hasCalledRef.current = true;
-      onResult('create');
+      onResult({ action: 'create' });
     } else if (branchStatus.status === 'local') {
       hasCalledRef.current = true;
-      onResult('use-existing');
+      onResult({ action: 'use-existing' });
+    } else if (branchStatus.status === 'remote-ref') {
+      hasCalledRef.current = true;
+      onResult({ action: 'track', remoteRef: branchStatus.remoteRef });
     }
-  }, [branchStatus.status, onResult]);
+  }, [branchStatus, onResult]);
 
   if (branchStatus.status === 'checking') {
     return (
@@ -56,9 +65,17 @@ export function BranchCheck({ branchName, onResult, onCancel }: BranchCheckProps
     return (
       <RemoteConfirm
         branchName={branchName}
-        onResult={onResult}
+        onResult={(action) => onResult({ action })}
         onCancel={onCancel}
       />
+    );
+  }
+
+  if (branchStatus.status === 'remote-ref') {
+    return (
+      <Text>
+        <Text color="cyan"><Spinner type="dots" /></Text> Tracking remote branch "{branchStatus.remoteRef.branch}" from {branchStatus.remoteRef.remote}...
+      </Text>
     );
   }
 

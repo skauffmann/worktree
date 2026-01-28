@@ -229,3 +229,36 @@ export async function gitFetch(): Promise<{ success: boolean; error?: string }> 
 
   return { success: true };
 }
+
+export interface RemoteBranchRef {
+  remote: string;
+  branch: string;
+  fullRef: string;
+}
+
+export function parseRemoteBranch(ref: string): RemoteBranchRef | null {
+  const remoteMatch = ref.match(/^remotes\/([^/]+)\/(.+)$/);
+  if (remoteMatch && remoteMatch[1] && remoteMatch[2]) {
+    return {
+      remote: remoteMatch[1],
+      branch: remoteMatch[2],
+      fullRef: ref,
+    };
+  }
+
+  const originMatch = ref.match(/^(origin)\/(.+)$/);
+  if (originMatch && originMatch[1] && originMatch[2]) {
+    return {
+      remote: originMatch[1],
+      branch: originMatch[2],
+      fullRef: ref,
+    };
+  }
+
+  return null;
+}
+
+export async function remoteRefExists(remote: string, branch: string): Promise<boolean> {
+  const result = await $`git ls-remote --exit-code --heads ${remote} ${branch}`.nothrow().quiet();
+  return result.exitCode === 0;
+}

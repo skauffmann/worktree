@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { branchExists } from '../lib/git.ts';
+import { branchExists, parseRemoteBranch, remoteRefExists, type RemoteBranchRef } from '../lib/git.ts';
 
 export type BranchStatus =
   | { status: 'checking' }
   | { status: 'not-found' }
   | { status: 'local' }
-  | { status: 'remote' };
+  | { status: 'remote' }
+  | { status: 'remote-ref'; remoteRef: RemoteBranchRef };
 
 export function useBranchCheck(branchName: string) {
   const [state, setState] = useState<BranchStatus>({ status: 'checking' });
@@ -15,6 +16,20 @@ export function useBranchCheck(branchName: string) {
 
     async function check() {
       try {
+        const remoteRef = parseRemoteBranch(branchName);
+
+        if (remoteRef) {
+          const exists = await remoteRefExists(remoteRef.remote, remoteRef.branch);
+          if (cancelled) return;
+
+          if (exists) {
+            setState({ status: 'remote-ref', remoteRef });
+          } else {
+            setState({ status: 'not-found' });
+          }
+          return;
+        }
+
         const result = await branchExists(branchName);
 
         if (cancelled) return;
