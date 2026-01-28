@@ -10,7 +10,8 @@ import {
   WorktreeActions,
   type WorktreeAction,
 } from './ui/worktree-actions.tsx';
-import { BranchCheck, type BranchAction } from './ui/branch-check.tsx';
+import { BranchCheck, type BranchCheckResult } from './ui/branch-check.tsx';
+import { parseRemoteBranch } from './lib/git.ts';
 import { Operations, type Operation } from './ui/operations.tsx';
 import { Version } from './ui/version.tsx';
 import {
@@ -230,11 +231,31 @@ export function App({ initialBranchName }: AppProps) {
     }
   };
 
-  const handleBranchCheck = async (action: BranchAction) => {
+  const handleBranchCheck = async (result: BranchCheckResult) => {
+    const { action, remoteRef } = result;
+
     if (action === 'use-existing') {
       setCtx((prev) => ({ ...prev, createNewBranch: false }));
     } else if (action === 'track') {
-      setCtx((prev) => ({ ...prev, createNewBranch: false }));
+      if (remoteRef) {
+        setCtx((prev) => ({
+          ...prev,
+          branchName: remoteRef.branch,
+          worktreePath: join(
+            prev.mainRepoPath,
+            '..',
+            `${prev.repoName}-${remoteRef.branch.replace(/\//g, '-')}`
+          ),
+          createNewBranch: true,
+          baseBranch: `${remoteRef.remote}/${remoteRef.branch}`,
+        }));
+      } else if (ctx.branchName) {
+        setCtx((prev) => ({
+          ...prev,
+          createNewBranch: true,
+          baseBranch: `origin/${prev.branchName}`,
+        }));
+      }
     } else {
       setCtx((prev) => ({ ...prev, createNewBranch: true }));
     }
