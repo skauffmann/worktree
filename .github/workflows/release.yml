@@ -116,7 +116,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist/${{ matrix.platform }}-${{ matrix.arch }}/bin
-          bun build --compile --minify --target=${{ matrix.target }} ./src/index.ts --outfile dist/${{ matrix.platform }}-${{ matrix.arch }}/bin/${{ matrix.binary }}
+          bun build --compile --minify --target=${{ matrix.target }} ./src/index.tsx --outfile dist/${{ matrix.platform }}-${{ matrix.arch }}/bin/${{ matrix.binary }}
 
       - name: Create package.json
         shell: bash

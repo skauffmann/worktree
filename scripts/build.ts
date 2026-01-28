@@ -31,7 +31,7 @@ async function build() {
     await mkdir(join(distDir, "bin"), { recursive: true });
 
     // Compile binary
-    const entryPoint = join(ROOT_DIR, "src", "index.ts");
+    const entryPoint = join(ROOT_DIR, "src", "index.tsx");
     const outfile = join(distDir, "bin", binaryName);
 
     await $`bun build --compile --minify --target=${target.bun} ${entryPoint} --outfile ${outfile}`;

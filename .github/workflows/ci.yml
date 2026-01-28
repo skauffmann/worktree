@@ -27,4 +27,4 @@ jobs:
         run: bun test
 
       - name: Build
-        run: bun build --compile ./src/index.ts --outfile dist/worktree
+        run: bun build --compile ./src/index.tsx --outfile dist/worktree
