@@ -15,6 +15,7 @@ import {
   branchExists,
   gitFetch,
   parseRemoteBranch,
+  listRemoteBranches,
 } from "./git";
 
 describe("parseRemoteBranch", () => {
@@ -177,6 +178,24 @@ describe("git", () => {
     test("should return error when no remote exists", async () => {
       const result = await gitFetch();
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe("listRemoteBranches", () => {
+    test("should return empty array when no remotes exist", async () => {
+      const branches = await listRemoteBranches();
+      expect(branches).toBeArray();
+      expect(branches.length).toBe(0);
+    });
+
+    test("should parse remote branches correctly", async () => {
+      const branches = await listRemoteBranches();
+      for (const branch of branches) {
+        expect(branch).toHaveProperty("remote");
+        expect(branch).toHaveProperty("branch");
+        expect(branch).toHaveProperty("fullRef");
+        expect(branch.fullRef).toBe(`${branch.remote}/${branch.branch}`);
+      }
     });
   });
 

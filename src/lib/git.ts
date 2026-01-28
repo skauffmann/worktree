@@ -262,3 +262,24 @@ export async function remoteRefExists(remote: string, branch: string): Promise<b
   const result = await $`git ls-remote --exit-code --heads ${remote} ${branch}`.nothrow().quiet();
   return result.exitCode === 0;
 }
+
+export async function listRemoteBranches(): Promise<RemoteBranchRef[]> {
+  const result = await $`git branch -r`.nothrow().quiet();
+  if (result.exitCode !== 0) return [];
+
+  const branches: RemoteBranchRef[] = [];
+  for (const line of result.stdout.toString().split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.includes('->')) continue;
+
+    const match = trimmed.match(/^([^/]+)\/(.+)$/);
+    if (match && match[1] && match[2]) {
+      branches.push({
+        remote: match[1],
+        branch: match[2],
+        fullRef: trimmed,
+      });
+    }
+  }
+  return branches;
+}
