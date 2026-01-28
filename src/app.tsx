@@ -10,7 +10,8 @@ import {
   WorktreeActions,
   type WorktreeAction,
 } from './ui/worktree-actions.tsx';
-import { BranchCheck, type BranchAction } from './ui/branch-check.tsx';
+import { BranchCheck, type BranchCheckResult } from './ui/branch-check.tsx';
+import { parseRemoteBranch } from './lib/git.ts';
 import { Operations, type Operation } from './ui/operations.tsx';
 import { Version } from './ui/version.tsx';
 import {
@@ -79,6 +80,7 @@ interface Context {
   worktreePath: string | null;
   createNewBranch: boolean;
   baseBranch: string | null;
+  branchExistsOnRemote: boolean;
   envFiles: string[];
   envAction: EnvAction;
   generatedFiles: string[];
@@ -100,6 +102,7 @@ function createInitialContext(): Context {
     worktreePath: null,
     createNewBranch: true,
     baseBranch: null,
+    branchExistsOnRemote: false,
     envFiles: [],
     envAction: 'nothing',
     generatedFiles: [],
@@ -230,11 +233,39 @@ export function App({ initialBranchName }: AppProps) {
     }
   };
 
-  const handleBranchCheck = async (action: BranchAction) => {
+  const handleBranchCheck = async (result: BranchCheckResult) => {
+    const { action, remoteRef } = result;
+
     if (action === 'use-existing') {
       setCtx((prev) => ({ ...prev, createNewBranch: false }));
     } else if (action === 'track') {
-      setCtx((prev) => ({ ...prev, createNewBranch: false }));
+      if (remoteRef) {
+        setCtx((prev) => ({
+          ...prev,
+          branchName: remoteRef.branch,
+          worktreePath: join(
+            prev.mainRepoPath,
+            '..',
+            `${prev.repoName}-${remoteRef.branch.replace(/\//g, '-')}`
+          ),
+          createNewBranch: true,
+          baseBranch: `${remoteRef.remote}/${remoteRef.branch}`,
+        }));
+      } else if (ctx.branchName) {
+        setCtx((prev) => ({
+          ...prev,
+          createNewBranch: true,
+          baseBranch: `origin/${prev.branchName}`,
+        }));
+      }
+    } else if (action === 'remote-exists') {
+      setCtx((prev) => ({
+        ...prev,
+        branchExistsOnRemote: true,
+        createNewBranch: true,
+      }));
+      await buildBatchQuestions({ branchExistsOnRemote: true });
+      return;
     } else {
       setCtx((prev) => ({ ...prev, createNewBranch: true }));
     }
@@ -242,7 +273,7 @@ export function App({ initialBranchName }: AppProps) {
     await buildBatchQuestions();
   };
 
-  const buildBatchQuestions = async () => {
+  const buildBatchQuestions = async (options?: { branchExistsOnRemote?: boolean }) => {
     const [
       envFiles,
       generatedFiles,
@@ -277,6 +308,15 @@ export function App({ initialBranchName }: AppProps) {
 
     const questions: Question[] = [];
     const initialValues: Answers = {};
+
+    if (options?.branchExistsOnRemote) {
+      questions.push({
+        id: 'trackRemote',
+        label: `Track remote branch "${ctx.branchName}"`,
+        type: 'boolean',
+      });
+      initialValues.trackRemote = true;
+    }
 
     if (showBaseBranch) {
       questions.push({
@@ -372,6 +412,13 @@ export function App({ initialBranchName }: AppProps) {
   const handleBatchConfig = async (answers: Answers) => {
     const batchData = step.type === 'batch-config' ? step.data : null;
     if (!batchData) return;
+
+    if (answers.trackRemote && ctx.branchExistsOnRemote) {
+      setCtx((prev) => ({
+        ...prev,
+        baseBranch: `origin/${prev.branchName}`,
+      }));
+    }
 
     if (answers.useOriginMain) {
       const defaultBranch = await getDefaultBranch();
