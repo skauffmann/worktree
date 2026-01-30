@@ -39,6 +39,7 @@ import {
   copyGeneratedFiles,
   detectRepoStructure,
   detectPackageManager,
+  type RepoStructure,
 } from './lib/files.ts';
 import { detectEditor, openInEditor } from './lib/editor.ts';
 import { detectTerminal, openInTerminal } from './lib/terminal.ts';
@@ -60,6 +61,7 @@ interface BatchConfigData {
   generatedFiles: string[];
   projectCount: number;
   showBaseBranch: boolean;
+  structure: RepoStructure;
 }
 
 type Step =
@@ -92,6 +94,7 @@ interface Context {
   savedConfig: Config | null;
   usingDefaults: boolean;
   preferredTerminal: string | null;
+  repoStructure: RepoStructure | null;
 }
 
 function createInitialContext(): Context {
@@ -114,6 +117,7 @@ function createInitialContext(): Context {
     savedConfig: null,
     usingDefaults: false,
     preferredTerminal: null,
+    repoStructure: null,
   };
 }
 
@@ -404,6 +408,7 @@ export function App({ initialBranchName }: AppProps) {
       generatedFiles,
       projectCount: structure.projects.length,
       showBaseBranch,
+      structure,
     };
 
     setStep({ type: 'batch-config', data: batchData });
@@ -441,6 +446,7 @@ export function App({ initialBranchName }: AppProps) {
       shouldInstallDeps: installDeps,
       shouldOpenEditor: openEditor,
       shouldOpenTerminal: openTerminal,
+      repoStructure: batchData.structure,
     }));
 
     if (saveConfig) {
@@ -578,21 +584,42 @@ export function App({ initialBranchName }: AppProps) {
       });
     }
 
-    if (ctx.shouldInstallDeps) {
-      ops.push({
-        id: 'deps',
-        label: 'Installing dependencies',
-        run: async () => {
-          const pm = await detectPackageManager(ctx.mainRepoPath);
-          const result = await $`cd ${worktreePath} && ${pm} install`
-            .nothrow()
-            .quiet();
-          return {
-            success: result.exitCode === 0,
-            message: result.exitCode === 0 ? `Installed with ${pm}` : 'Failed',
-          };
-        },
-      });
+    if (ctx.shouldInstallDeps && ctx.repoStructure) {
+      const { type, projects } = ctx.repoStructure;
+
+      if (type === 'multi-project' && projects.length > 0) {
+        for (const project of projects) {
+          const projectPath = join(worktreePath, project.relativePath);
+          ops.push({
+            id: `deps-${project.relativePath}`,
+            label: `Installing deps (${project.relativePath === '.' ? 'root' : project.relativePath})`,
+            run: async () => {
+              const result = await $`cd ${projectPath} && ${project.packageManager} install`
+                .nothrow()
+                .quiet();
+              return {
+                success: result.exitCode === 0,
+                message: result.exitCode === 0 ? project.packageManager : 'Failed',
+              };
+            },
+          });
+        }
+      } else {
+        ops.push({
+          id: 'deps',
+          label: 'Installing dependencies',
+          run: async () => {
+            const pm = await detectPackageManager(ctx.mainRepoPath);
+            const result = await $`cd ${worktreePath} && ${pm} install`
+              .nothrow()
+              .quiet();
+            return {
+              success: result.exitCode === 0,
+              message: result.exitCode === 0 ? `Installed with ${pm}` : 'Failed',
+            };
+          },
+        });
+      }
     }
 
     if (ctx.shouldOpenEditor) {
