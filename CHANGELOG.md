@@ -1,3 +1,15 @@
+# [1.10.0](https://github.com/skauffmann/worktree/compare/v1.9.0...v1.10.0) (2026-01-30)
+
+
+### Bug Fixes
+
+* open terminal before editor to prevent focus stealing ([#25](https://github.com/skauffmann/worktree/issues/25)) ([56e2f36](https://github.com/skauffmann/worktree/commit/56e2f360eede2680b88dbd4410ecd347938732b5))
+
+
+### Features
+
+* install dependencies for multi-project repos ([#26](https://github.com/skauffmann/worktree/issues/26)) ([f20c6fe](https://github.com/skauffmann/worktree/commit/f20c6fee85661315e829808bb9d7017eb6f73bf3))
+
 # [1.9.0](https://github.com/skauffmann/worktree/compare/v1.8.0...v1.9.0) (2026-01-28)
 
 
