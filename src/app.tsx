@@ -622,6 +622,23 @@ export function App({ initialBranchName }: AppProps) {
       }
     }
 
+    if (ctx.shouldOpenTerminal) {
+      ops.push({
+        id: 'terminal',
+        label: 'Opening terminal',
+        run: async () => {
+          const success = await openInTerminal(
+            worktreePath,
+            `${ctx.repoName}: ${ctx.branchName}`
+          );
+          if (success) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+          return { success, message: success ? 'Opened' : 'Failed' };
+        },
+      });
+    }
+
     if (ctx.shouldOpenEditor) {
       ops.push({
         id: 'editor',
@@ -633,20 +650,6 @@ export function App({ initialBranchName }: AppProps) {
             return { success: true, message: 'Opened' };
           }
           return { success: false, message: 'No editor found' };
-        },
-      });
-    }
-
-    if (ctx.shouldOpenTerminal) {
-      ops.push({
-        id: 'terminal',
-        label: 'Opening terminal',
-        run: async () => {
-          const success = await openInTerminal(
-            worktreePath,
-            `${ctx.repoName}: ${ctx.branchName}`
-          );
-          return { success, message: success ? 'Opened' : 'Failed' };
         },
       });
     }
