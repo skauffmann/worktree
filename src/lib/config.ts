@@ -14,10 +14,12 @@ const DefaultValuesSchema = z.object({
 
 const RepoConfigSchema = z.object({
   defaultValues: DefaultValuesSchema,
+  afterScripts: z.array(z.string()).optional(),
 });
 
 const ConfigSchema = z.object({
   terminal: z.string().optional(),
+  afterScripts: z.array(z.string()).optional(),
   repositories: z.record(z.string(), RepoConfigSchema).optional(),
 });
 
@@ -73,6 +75,15 @@ export function getRepoConfig(
   return config.repositories[repoName] || null;
 }
 
+export function getAfterScripts(
+  config: Config | null,
+  repoName: string
+): string[] {
+  const globalScripts = config?.afterScripts ?? [];
+  const repoScripts = config?.repositories?.[repoName]?.afterScripts ?? [];
+  return [...globalScripts, ...repoScripts];
+}
+
 export async function saveRepoConfig(
   repoName: string,
   defaultValues: DefaultValues
@@ -98,7 +109,7 @@ export async function saveRepoConfig(
     ...existingConfig,
     repositories: {
       ...existingConfig.repositories,
-      [repoName]: { defaultValues },
+      [repoName]: { ...existingConfig.repositories?.[repoName], defaultValues },
     },
   };
 

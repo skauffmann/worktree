@@ -92,6 +92,28 @@ describe("config", () => {
       expect(result.error).toContain("Failed to read config");
     });
 
+    test("should load config with afterScripts", async () => {
+      const configWithScripts = {
+        terminal: "iterm",
+        afterScripts: ["echo 'global'"],
+        repositories: {
+          "my-repo": {
+            defaultValues: {
+              dotEnvAction: "symlink" as const,
+            },
+            afterScripts: ["bun run db:migrate"],
+          },
+        },
+      };
+      await writeFile(configPath, JSON.stringify(configWithScripts));
+
+      const { loadConfig } = await getConfigModule();
+      const result = await loadConfig();
+      expect(result.success).toBe(true);
+      expect(result.config?.afterScripts).toEqual(["echo 'global'"]);
+      expect(result.config?.repositories?.["my-repo"]?.afterScripts).toEqual(["bun run db:migrate"]);
+    });
+
     test("should return error for invalid schema", async () => {
       const invalidConfig = {
         repositories: {
@@ -150,6 +172,75 @@ describe("config", () => {
       };
       const result = getRepoConfig(config, "my-repo");
       expect(result).toEqual(repoConfig);
+    });
+  });
+
+  describe("getAfterScripts", () => {
+    test("should return empty array for null config", async () => {
+      const { getAfterScripts } = await getConfigModule();
+      expect(getAfterScripts(null, "my-repo")).toEqual([]);
+    });
+
+    test("should return global scripts only", async () => {
+      const { getAfterScripts } = await getConfigModule();
+      const config = {
+        afterScripts: ["echo 'global'"],
+      };
+      expect(getAfterScripts(config, "my-repo")).toEqual(["echo 'global'"]);
+    });
+
+    test("should return repo scripts only", async () => {
+      const { getAfterScripts } = await getConfigModule();
+      const config = {
+        repositories: {
+          "my-repo": {
+            defaultValues: {},
+            afterScripts: ["bun run db:migrate"],
+          },
+        },
+      };
+      expect(getAfterScripts(config, "my-repo")).toEqual(["bun run db:migrate"]);
+    });
+
+    test("should merge global and repo scripts with global first", async () => {
+      const { getAfterScripts } = await getConfigModule();
+      const config = {
+        afterScripts: ["echo 'global'"],
+        repositories: {
+          "my-repo": {
+            defaultValues: {},
+            afterScripts: ["bun run db:migrate", "bun run seed"],
+          },
+        },
+      };
+      expect(getAfterScripts(config, "my-repo")).toEqual([
+        "echo 'global'",
+        "bun run db:migrate",
+        "bun run seed",
+      ]);
+    });
+
+    test("should return empty array when no scripts defined", async () => {
+      const { getAfterScripts } = await getConfigModule();
+      const config = {
+        repositories: {
+          "my-repo": { defaultValues: {} },
+        },
+      };
+      expect(getAfterScripts(config, "my-repo")).toEqual([]);
+    });
+
+    test("should not include scripts from other repos", async () => {
+      const { getAfterScripts } = await getConfigModule();
+      const config = {
+        repositories: {
+          "other-repo": {
+            defaultValues: {},
+            afterScripts: ["echo 'other'"],
+          },
+        },
+      };
+      expect(getAfterScripts(config, "my-repo")).toEqual([]);
     });
   });
 
@@ -216,6 +307,32 @@ describe("config", () => {
       const content = JSON.parse(await readFile(configPath, "utf-8"));
       expect(content.repositories["my-repo"].defaultValues.dotEnvAction).toBe("symlink");
       expect(content.repositories["my-repo"].defaultValues.copyGeneratedFiles).toBe(true);
+    });
+
+    test("should preserve afterScripts when saving defaultValues", async () => {
+      const existingConfig = {
+        repositories: {
+          "my-repo": {
+            defaultValues: {
+              dotEnvAction: "symlink",
+            },
+            afterScripts: ["bun run db:migrate"],
+          },
+        },
+      };
+      await writeFile(configPath, JSON.stringify(existingConfig));
+
+      const { saveRepoConfig } = await getConfigModule();
+      const result = await saveRepoConfig("my-repo", {
+        dotEnvAction: "copy",
+        installDependencies: true,
+      });
+      expect(result.success).toBe(true);
+
+      const content = JSON.parse(await readFile(configPath, "utf-8"));
+      expect(content.repositories["my-repo"].defaultValues.dotEnvAction).toBe("copy");
+      expect(content.repositories["my-repo"].defaultValues.installDependencies).toBe(true);
+      expect(content.repositories["my-repo"].afterScripts).toEqual(["bun run db:migrate"]);
     });
 
     test("should start fresh if existing config is corrupted", async () => {

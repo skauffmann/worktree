@@ -47,6 +47,7 @@ import {
   loadConfig,
   getRepoConfig,
   saveRepoConfig,
+  getAfterScripts,
   type Config,
   type DefaultValues,
 } from './lib/config.ts';
@@ -650,6 +651,27 @@ export function App({ initialBranchName }: AppProps) {
             return { success: true, message: 'Opened' };
           }
           return { success: false, message: 'No editor found' };
+        },
+      });
+    }
+
+    const afterScripts = getAfterScripts(ctx.savedConfig, ctx.repoName);
+    for (const script of afterScripts) {
+      ops.push({
+        id: `after-script-${ops.length}`,
+        label: `Running: ${script}`,
+        run: async () => {
+          const result = await $`cd ${worktreePath} && sh -c ${script}`
+            .nothrow()
+            .quiet();
+          return {
+            success: result.exitCode === 0,
+            message:
+              result.exitCode === 0
+                ? 'Done'
+                : result.stderr.toString().trim() ||
+                  `Exit code ${result.exitCode}`,
+          };
         },
       });
     }
