@@ -1,6 +1,6 @@
 {
   "name": "@skauffmann/worktree",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "module": "src/index.tsx",
   "type": "module",
   "bin": {

@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/skauffmann/worktree/compare/v1.10.0...v1.11.0) (2026-02-04)
+
+
+### Features
+
+* add afterScripts support in configuration ([#27](https://github.com/skauffmann/worktree/issues/27)) ([51a4767](https://github.com/skauffmann/worktree/commit/51a4767768cae545783e71b2f6ecd6f7e1ce9620))
+
 # [1.10.0](https://github.com/skauffmann/worktree/compare/v1.9.0...v1.10.0) (2026-01-30)
 
 
