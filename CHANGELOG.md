@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/skauffmann/worktree/compare/v1.11.0...v1.12.0) (2026-02-04)
+
+
+### Features
+
+* run afterScripts before opening terminal and editor ([#28](https://github.com/skauffmann/worktree/issues/28)) ([8e7dcab](https://github.com/skauffmann/worktree/commit/8e7dcab5d0e38a6b99e851314e9231078e22915b))
+
 # [1.11.0](https://github.com/skauffmann/worktree/compare/v1.10.0...v1.11.0) (2026-02-04)
 
 
