@@ -92,6 +92,25 @@ describe("config", () => {
       expect(result.error).toContain("Failed to read config");
     });
 
+    test("should load config with editor at global and repo level", async () => {
+      const configWithEditor = {
+        editor: "cursor",
+        repositories: {
+          "my-repo": {
+            editor: "zed",
+            defaultValues: {},
+          },
+        },
+      };
+      await writeFile(configPath, JSON.stringify(configWithEditor));
+
+      const { loadConfig } = await getConfigModule();
+      const result = await loadConfig();
+      expect(result.success).toBe(true);
+      expect(result.config?.editor).toBe("cursor");
+      expect(result.config?.repositories?.["my-repo"]?.editor).toBe("zed");
+    });
+
     test("should load config with afterScripts", async () => {
       const configWithScripts = {
         terminal: "iterm",
@@ -241,6 +260,53 @@ describe("config", () => {
         },
       };
       expect(getAfterScripts(config, "my-repo")).toEqual([]);
+    });
+  });
+
+  describe("getEditor", () => {
+    test("should return null for null config", async () => {
+      const { getEditor } = await getConfigModule();
+      expect(getEditor(null, "my-repo")).toBeNull();
+    });
+
+    test("should return global editor when no repo editor", async () => {
+      const { getEditor } = await getConfigModule();
+      const config = { editor: "cursor" };
+      expect(getEditor(config, "my-repo")).toBe("cursor");
+    });
+
+    test("should return repo editor over global editor", async () => {
+      const { getEditor } = await getConfigModule();
+      const config = {
+        editor: "cursor",
+        repositories: {
+          "my-repo": {
+            editor: "zed",
+            defaultValues: {},
+          },
+        },
+      };
+      expect(getEditor(config, "my-repo")).toBe("zed");
+    });
+
+    test("should return global editor for repos without editor override", async () => {
+      const { getEditor } = await getConfigModule();
+      const config = {
+        editor: "cursor",
+        repositories: {
+          "my-repo": {
+            editor: "zed",
+            defaultValues: {},
+          },
+        },
+      };
+      expect(getEditor(config, "other-repo")).toBe("cursor");
+    });
+
+    test("should return null when no editor configured", async () => {
+      const { getEditor } = await getConfigModule();
+      const config = { terminal: "iterm" };
+      expect(getEditor(config, "my-repo")).toBeNull();
     });
   });
 

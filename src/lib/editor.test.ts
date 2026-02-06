@@ -26,6 +26,20 @@ describe("editor", () => {
       expect(editor).toBe("nvim");
     });
 
+    test("should return preferred editor when available", async () => {
+      const editor = await detectEditor("bash");
+
+      expect(editor).toBe("bash");
+    });
+
+    test("should fall back to env var when preferred editor is not available", async () => {
+      process.env.WORKTREE_EDITOR = "nvim";
+
+      const editor = await detectEditor("nonexistent-editor-xyz");
+
+      expect(editor).toBe("nvim");
+    });
+
     test("should detect an available editor", async () => {
       const editor = await detectEditor();
 
