@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/skauffmann/worktree/compare/v1.12.0...v1.13.0) (2026-02-06)
+
+
+### Features
+
+* add editor preference in configuration ([#29](https://github.com/skauffmann/worktree/issues/29)) ([bf7f425](https://github.com/skauffmann/worktree/commit/bf7f42584db7865c3098e35960ab99c8f39c43b7))
+
 # [1.12.0](https://github.com/skauffmann/worktree/compare/v1.11.0...v1.12.0) (2026-02-04)
 
 
