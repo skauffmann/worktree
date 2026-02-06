@@ -48,6 +48,7 @@ import {
   getRepoConfig,
   saveRepoConfig,
   getAfterScripts,
+  getEditor,
   type Config,
   type DefaultValues,
 } from './lib/config.ts';
@@ -94,6 +95,7 @@ interface Context {
   actionOnExisting: WorktreeAction | null;
   savedConfig: Config | null;
   usingDefaults: boolean;
+  preferredEditor: string | null;
   preferredTerminal: string | null;
   repoStructure: RepoStructure | null;
 }
@@ -117,6 +119,7 @@ function createInitialContext(): Context {
     actionOnExisting: null,
     savedConfig: null,
     usingDefaults: false,
+    preferredEditor: null,
     preferredTerminal: null,
     repoStructure: null,
   };
@@ -145,6 +148,7 @@ export function App({ initialBranchName }: AppProps) {
       ]);
 
       const savedConfig = configResult.success ? configResult.config : null;
+      const preferredEditor = getEditor(savedConfig, repoName);
       const preferredTerminal = savedConfig?.terminal || null;
 
       setCtx((prev) => ({
@@ -152,6 +156,7 @@ export function App({ initialBranchName }: AppProps) {
         repoName,
         mainRepoPath,
         savedConfig,
+        preferredEditor,
         preferredTerminal,
       }));
 
@@ -295,7 +300,7 @@ export function App({ initialBranchName }: AppProps) {
       getCurrentBranch(),
       getDefaultBranch(),
       detectPackageManager(ctx.mainRepoPath),
-      detectEditor(),
+      detectEditor(ctx.preferredEditor ?? undefined),
       detectTerminal(),
     ]);
 
@@ -488,7 +493,7 @@ export function App({ initialBranchName }: AppProps) {
         id: 'open',
         label: 'Opening in editor',
         run: async () => {
-          const editor = await detectEditor();
+          const editor = await detectEditor(ctx.preferredEditor ?? undefined);
           if (editor) {
             await openInEditor(editor, worktreePath);
             return { success: true, message: 'Opened' };
@@ -666,7 +671,7 @@ export function App({ initialBranchName }: AppProps) {
         id: 'editor',
         label: 'Opening in editor',
         run: async () => {
-          const editor = await detectEditor();
+          const editor = await detectEditor(ctx.preferredEditor ?? undefined);
           if (editor) {
             await openInEditor(editor, worktreePath);
             return { success: true, message: 'Opened' };

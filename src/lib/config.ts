@@ -13,11 +13,13 @@ const DefaultValuesSchema = z.object({
 });
 
 const RepoConfigSchema = z.object({
+  editor: z.string().optional(),
   defaultValues: DefaultValuesSchema,
   afterScripts: z.array(z.string()).optional(),
 });
 
 const ConfigSchema = z.object({
+  editor: z.string().optional(),
   terminal: z.string().optional(),
   afterScripts: z.array(z.string()).optional(),
   repositories: z.record(z.string(), RepoConfigSchema).optional(),
@@ -82,6 +84,14 @@ export function getAfterScripts(
   const globalScripts = config?.afterScripts ?? [];
   const repoScripts = config?.repositories?.[repoName]?.afterScripts ?? [];
   return [...globalScripts, ...repoScripts];
+}
+
+export function getEditor(
+  config: Config | null,
+  repoName: string
+): string | null {
+  const repoEditor = config?.repositories?.[repoName]?.editor;
+  return repoEditor ?? config?.editor ?? null;
 }
 
 export async function saveRepoConfig(
